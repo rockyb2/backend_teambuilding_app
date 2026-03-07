@@ -14,6 +14,7 @@ from api.affectations import router as affectations_router
 from api.depenses import router as depenses_router
 from api.utilisateurs import router as utilisateurs_router
 from api.uploads import router as uploads_router
+from api.agent.routes import router as agent_router
 
 
 def include_api_routes(app):
@@ -30,4 +31,5 @@ def include_api_routes(app):
     app.include_router(depenses_router)
     app.include_router(utilisateurs_router)
     app.include_router(uploads_router)
+    app.include_router(agent_router)
 

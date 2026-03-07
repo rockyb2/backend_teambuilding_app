@@ -1,7 +1,0 @@
-fastapi
-uvicorn[standard]
-sqlalchemy
-psycopg2        # ou psycopg2
-python-multipart
-passlib[bcrypt]
-python-jose[cryptography]
