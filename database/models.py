@@ -1,4 +1,9 @@
-﻿from sqlalchemy import (
+﻿import binascii
+import hashlib
+import hmac
+import os
+
+from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Column,
@@ -15,10 +20,6 @@
 from sqlalchemy.orm import relationship
 
 from database.base import Base
-import os
-import hmac
-import hashlib
-import binascii
 
 
 class Client(Base):
@@ -32,7 +33,11 @@ class Client(Base):
     telephone = Column(String(20), nullable=True)
     adresse = Column(Text, nullable=True)
     date_creation = Column(DateTime, nullable=False, server_default=func.now())
-    id_utilisateur_create = Column(Integer, ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"), nullable=True)
+    id_utilisateur_create = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     demandes = relationship("Demande", back_populates="client", cascade="all, delete-orphan")
 
@@ -56,35 +61,34 @@ class Demande(Base):
     description = Column(Text, nullable=True)
     nombre_participants = Column(Integer, nullable=True)
     budget_estime = Column(Numeric(12, 2), nullable=True)
-
     statut = Column(
         String(30),
         nullable=False,
         default="en_attente",
         server_default=text("'en_attente'"),
     )
-
     source = Column(
         String(30),
         nullable=False,
         default="client",
         server_default=text("'client'"),
     )
-
     id_client = Column(
         Integer,
         ForeignKey("client.id_client", ondelete="CASCADE"),
         nullable=False,
     )
-
     id_utilisateur = Column(
         Integer,
         ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
         nullable=True,
     )
-
     date_creation = Column(DateTime, nullable=False, server_default=func.now())
-    id_utilisateur_create = Column(Integer, ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"), nullable=True)
+    id_utilisateur_create = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     client = relationship("Client", back_populates="demandes")
     utilisateur = relationship(
@@ -94,6 +98,15 @@ class Demande(Base):
     )
     offres = relationship("Offre", back_populates="demande", cascade="all, delete-orphan")
 
+
+class ContactAkan(Base):
+    __tablename__ = "contact_akan"
+    id = Column(Integer, primary_key=True, index=True)
+    nom = Column(String(100), nullable=False)
+    prenoms = Column(String(100), nullable=True)
+    email = Column(String(150), unique=True, nullable=True)
+    telephone = Column(String(20), nullable=True)
+    
 
 class Offre(Base):
     __tablename__ = "offre"
@@ -114,7 +127,11 @@ class Offre(Base):
         server_default=text("'brouillon'"),
     )
     id_demande = Column(Integer, ForeignKey("demande.id_demande", ondelete="CASCADE"), nullable=False)
-    id_utilisateur_create = Column(Integer, ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"), nullable=True)
+    id_utilisateur_create = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     demande = relationship("Demande", back_populates="offres")
     activite = relationship("Activite", back_populates="offre", uselist=False)
@@ -131,7 +148,11 @@ class Site(Base):
     type_site = Column(String(50), nullable=True)
     image_site = Column(String(500), nullable=True)
     date_creation = Column(DateTime, nullable=False, server_default=func.now())
-    id_utilisateur_create = Column(Integer, ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"), nullable=True)
+    id_utilisateur_create = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     activites = relationship("Activite", back_populates="site")
 
@@ -164,7 +185,11 @@ class Activite(Base):
     )
     id_site = Column(Integer, ForeignKey("site.id_site"), nullable=False)
     date_creation = Column(DateTime, nullable=False, server_default=func.now())
-    id_utilisateur_create = Column(Integer, ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"), nullable=True)
+    id_utilisateur_create = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     offre = relationship("Offre", back_populates="activite")
     site = relationship("Site", back_populates="activites")
@@ -186,7 +211,11 @@ class Jeu(Base):
     materiel_requis = Column(Text, nullable=True)
     image_jeux = Column(String(255), nullable=True)
     date_creation = Column(DateTime, nullable=False, server_default=func.now())
-    id_utilisateur_create = Column(Integer, ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"), nullable=True)
+    id_utilisateur_create = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     activite_jeux = relationship("ActiviteJeu", back_populates="jeu", cascade="all, delete-orphan")
 
@@ -203,7 +232,11 @@ class ActiviteJeu(Base):
     ordre = Column(Integer, nullable=True)
     duree_prevue = Column(Integer, nullable=True)
     date_creation = Column(DateTime, nullable=False, server_default=func.now())
-    id_utilisateur_create = Column(Integer, ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"), nullable=True)
+    id_utilisateur_create = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     activite = relationship("Activite", back_populates="activite_jeux")
     jeu = relationship("Jeu", back_populates="activite_jeux")
@@ -220,7 +253,11 @@ class Personnel(Base):
     email = Column(String(150), unique=True, nullable=True)
     adresse = Column(String(255), nullable=True)
     date_creation = Column(DateTime, nullable=False, server_default=func.now())
-    id_utilisateur_create = Column(Integer, ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"), nullable=True)
+    id_utilisateur_create = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     affectations = relationship("Affectation", back_populates="personnel", cascade="all, delete-orphan")
 
@@ -239,7 +276,11 @@ class Affectation(Base):
     heure_debut = Column(DateTime, nullable=True)
     heure_fin = Column(DateTime, nullable=True)
     date_creation = Column(DateTime, nullable=False, server_default=func.now())
-    id_utilisateur_create = Column(Integer, ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"), nullable=True)
+    id_utilisateur_create = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     activite = relationship("Activite", back_populates="affectations")
     personnel = relationship("Personnel", back_populates="affectations")
@@ -256,9 +297,153 @@ class Depense(Base):
     type_depense = Column(String(100), nullable=True)
     id_activite = Column(Integer, ForeignKey("activite.id_activite", ondelete="CASCADE"), nullable=False)
     date_creation = Column(DateTime, nullable=False, server_default=func.now())
-    id_utilisateur_create = Column(Integer, ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"), nullable=True)
+    id_utilisateur_create = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     activite = relationship("Activite", back_populates="depenses")
+
+
+class DemandeTourisme(Base):
+    __tablename__ = "demandes_tourisme"
+    __table_args__ = (
+        CheckConstraint("nombre_voyageurs > 0", name="ck_demandes_tourisme_nombre_voyageurs_pos"),
+        CheckConstraint(
+            "statut IN ('nouvelle', 'contactee', 'devis_envoye', 'confirmee', 'annulee')",
+            name="ck_demandes_tourisme_statut",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    circuit_externe_id = Column(Integer, nullable=True)
+    titre_circuit = Column(String(255), nullable=False)
+    lieu_circuit = Column(String(255), nullable=True)
+    duree_circuit = Column(String(120), nullable=True)
+    formule_choisie = Column(String(100), nullable=True)
+    prix_formule = Column(Numeric(12, 2), nullable=False, default=0, server_default=text("0"))
+    date_depart_souhaitee = Column(Date, nullable=True)
+    prenom = Column(String(120), nullable=False)
+    nom = Column(String(120), nullable=False)
+    telephone = Column(String(50), nullable=False)
+    email = Column(String(255), nullable=False, index=True)
+    nombre_voyageurs = Column(Integer, nullable=False, default=1, server_default=text("1"))
+    note_client = Column(Text, nullable=True)
+    prix_total_estime = Column(Numeric(12, 2), nullable=False, default=0, server_default=text("0"))
+    source = Column(String(30), nullable=False, default="site_web", server_default=text("'site_web'"))
+    statut = Column(
+        String(30),
+        nullable=False,
+        default="nouvelle",
+        server_default=text("'nouvelle'"),
+    )
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+
+class DemandeTeamBuilding(Base):
+    __tablename__ = "demandes_team_building"
+    __table_args__ = (
+        CheckConstraint(
+            "nombre_participants > 0",
+            name="ck_demandes_team_building_nombre_participants_pos",
+        ),
+        CheckConstraint(
+            "statut IN ('nouvelle', 'contactee', 'devis_envoye', 'confirmee', 'annulee')",
+            name="ck_demandes_team_building_statut",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    entreprise = Column(String(255), nullable=False)
+    nom_contact = Column(String(255), nullable=False)
+    fonction_contact = Column(String(150), nullable=True)
+    telephone_contact = Column(String(50), nullable=False)
+    email_contact = Column(String(255), nullable=False, index=True)
+    nombre_participants = Column(Integer, nullable=False)
+    objectif = Column(Text, nullable=False)
+    lieu_souhaite = Column(String(255), nullable=True)
+    date_souhaitee = Column(Date, nullable=True)
+    type_activite = Column(String(255), nullable=True)
+    avec_salle = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    avec_nuitee = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    nombre_nuitees = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    transport_inclus = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    restauration_incluse = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    hebergement_inclus = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    experience_precedente = Column(Text, nullable=True)
+    source_decouverte = Column(String(255), nullable=True)
+    source = Column(String(30), nullable=False, default="site_web", server_default=text("'site_web'"))
+    statut = Column(
+        String(30),
+        nullable=False,
+        default="nouvelle",
+        server_default=text("'nouvelle'"),
+    )
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    cadres = relationship(
+        "DemandeTeamBuildingCadre",
+        back_populates="demande_team_building",
+        cascade="all, delete-orphan",
+    )
+
+
+class DemandeTeamBuildingCadre(Base):
+    __tablename__ = "demandes_team_building_cadres"
+    __table_args__ = (
+        CheckConstraint(
+            "cadre IN ('interieur', 'plein_air', 'mixte')",
+            name="ck_demandes_team_building_cadres_cadre",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    demande_team_building_id = Column(
+        Integer,
+        ForeignKey("demandes_team_building.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    cadre = Column(String(30), nullable=False)
+
+    demande_team_building = relationship("DemandeTeamBuilding", back_populates="cadres")
+
+
+class DemandeContact(Base):
+    __tablename__ = "demandes_contact"
+    __table_args__ = (
+        CheckConstraint(
+            "type_demande IN ('tourisme', 'team_building', 'podcast', 'autre')",
+            name="ck_demandes_contact_type_demande",
+        ),
+        CheckConstraint(
+            "statut IN ('nouvelle', 'traitee', 'fermee')",
+            name="ck_demandes_contact_statut",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    nom_complet = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=False, index=True)
+    sujet = Column(String(120), nullable=True)
+    message = Column(Text, nullable=False)
+    type_demande = Column(
+        String(30),
+        nullable=False,
+        default="autre",
+        server_default=text("'autre'"),
+    )
+    source = Column(String(30), nullable=False, default="site_web", server_default=text("'site_web'"))
+    statut = Column(
+        String(30),
+        nullable=False,
+        default="nouvelle",
+        server_default=text("'nouvelle'"),
+    )
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class Role(Base):
@@ -281,8 +466,13 @@ class Utilisateur(Base):
     id_role = Column(Integer, ForeignKey("roles.id", ondelete="RESTRICT"), nullable=False)
     actif = Column(Boolean, nullable=False, default=True, server_default=text("true"))
     date_creation = Column(DateTime, nullable=False, server_default=func.now())
-    id_utilisateur_create = Column(Integer, ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"), nullable=True)
+    id_utilisateur_create = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
     image_utilisateur = Column(String(500), nullable=True)
+
     role_rel = relationship("Role", back_populates="utilisateurs")
     demandes = relationship(
         "Demande",
@@ -298,7 +488,11 @@ class Utilisateur(Base):
         salt = os.urandom(16)
         iterations = 100_000
         dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
-        self.mot_de_passe = f"pbkdf2_sha256${iterations}${binascii.hexlify(salt).decode()}${binascii.hexlify(dk).decode()}"
+        self.mot_de_passe = (
+            f"pbkdf2_sha256${iterations}$"
+            f"{binascii.hexlify(salt).decode()}$"
+            f"{binascii.hexlify(dk).decode()}"
+        )
 
     def check_password(self, password: str) -> bool:
         try:

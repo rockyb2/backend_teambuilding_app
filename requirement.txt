@@ -7,7 +7,8 @@ passlib[bcrypt]
 python-jose[cryptography]
 smolagents
 mistralai
-docx
+python-docx
 reportlab
 openpyxl
 sib_api_v3_sdk
+littlellm

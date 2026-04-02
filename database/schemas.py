@@ -10,6 +10,24 @@ except ImportError:  # pragma: no cover
     ConfigDict = None
 
 
+class ContactAkanBase(BaseModel):
+    nom: str
+    prenoms: str
+    email: str
+    telephone: Optional[str] = None
+    
+
+class ContactAkanCreate(ContactAkanBase):
+    pass
+
+class ContactAkanResponse(ContactAkanBase):
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    class Config:
+        from_attributes = True
+
 class ORMBaseModel(BaseModel):
     if ConfigDict is not None:
         model_config = ConfigDict(from_attributes=True)
@@ -224,6 +242,102 @@ class DepenseRead(DepenseBase):
     id_depense: int
 
 
+class DemandeTourismeBase(ORMBaseModel):
+    circuit_externe_id: Optional[int] = None
+    titre_circuit: str
+    lieu_circuit: Optional[str] = None
+    duree_circuit: Optional[str] = None
+    formule_choisie: Optional[str] = None
+    prix_formule: Optional[Decimal] = Decimal("0")
+    date_depart_souhaitee: Optional[date] = None
+    prenom: str
+    nom: str
+    telephone: str
+    email: str
+    nombre_voyageurs: int = 1
+    note_client: Optional[str] = None
+    prix_total_estime: Optional[Decimal] = Decimal("0")
+    source: Optional[str] = "site_web"
+    statut: Optional[str] = "nouvelle"
+
+
+class DemandeTourismeCreate(DemandeTourismeBase):
+    pass
+
+
+class DemandeTourismeRead(DemandeTourismeBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class DemandeTeamBuildingCadreBase(ORMBaseModel):
+    cadre: str
+
+
+class DemandeTeamBuildingCadreCreate(DemandeTeamBuildingCadreBase):
+    pass
+
+
+class DemandeTeamBuildingCadreRead(DemandeTeamBuildingCadreBase):
+    id: int
+    demande_team_building_id: int
+
+
+class DemandeTeamBuildingBase(ORMBaseModel):
+    entreprise: str
+    nom_contact: str
+    fonction_contact: Optional[str] = None
+    telephone_contact: str
+    email_contact: str
+    nombre_participants: int
+    objectif: str
+    lieu_souhaite: Optional[str] = None
+    date_souhaitee: Optional[date] = None
+    type_activite: Optional[str] = None
+    avec_salle: Optional[bool] = False
+    avec_nuitee: Optional[bool] = False
+    nombre_nuitees: Optional[int] = 0
+    transport_inclus: Optional[bool] = False
+    restauration_incluse: Optional[bool] = False
+    hebergement_inclus: Optional[bool] = False
+    experience_precedente: Optional[str] = None
+    source_decouverte: Optional[str] = None
+    source: Optional[str] = "site_web"
+    statut: Optional[str] = "nouvelle"
+
+
+class DemandeTeamBuildingCreate(DemandeTeamBuildingBase):
+    cadres: list[DemandeTeamBuildingCadreCreate] = []
+
+
+class DemandeTeamBuildingRead(DemandeTeamBuildingBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+    cadres: list[DemandeTeamBuildingCadreRead] = []
+
+
+class DemandeContactBase(ORMBaseModel):
+    nom_complet: str
+    email: str
+    sujet: Optional[str] = None
+    message: str
+    type_demande: Optional[str] = "autre"
+    source: Optional[str] = "site_web"
+    statut: Optional[str] = "nouvelle"
+
+
+class DemandeContactCreate(DemandeContactBase):
+    pass
+
+
+class DemandeContactRead(DemandeContactBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+
 class UtilisateurBase(ORMBaseModel):
     nom: str
     prenom: Optional[str] = None
@@ -266,3 +380,5 @@ class UtilisateurUpdate(ORMBaseModel):
     actif: Optional[bool] = None
     id_utilisateur_create: Optional[int] = None
     image_utilisateur: Optional[str] = None
+
+

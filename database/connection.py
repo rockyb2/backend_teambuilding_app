@@ -23,3 +23,6 @@ def create_tables():
     from database import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    
+    
+
