@@ -6,11 +6,11 @@ from crud.contact_akan import create_contact_akan, get_all_contacts_akan, get_co
 
 router = APIRouter(prefix="/contact-akan", tags=["Contact Akan"])
 
-@router.post("/", response_model=ContactAkanResponse)
+@router.post("/ajouter", response_model=ContactAkanResponse)
 def create_contact(contact: ContactAkanCreate, db: Session = Depends(get_db)):
     return create_contact_akan(db, contact)
 
-@router.get("/", response_model=list[ContactAkanResponse])
+@router.get("/liste", response_model=list[ContactAkanResponse])
 def list_contacts(db: Session = Depends(get_db)):
     return get_all_contacts_akan(db)
 

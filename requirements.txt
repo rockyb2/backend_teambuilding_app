@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary
+python-multipart
+passlib[bcrypt]
+python-jose[cryptography]
+smolagents
+mistralai
+python-docx
+reportlab
+openpyxl
+sib_api_v3_sdk
+litellm

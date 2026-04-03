@@ -1,13 +1,25 @@
 import os
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from database.base import Base
 
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-DATABASE_URL ="postgresql+psycopg2://postgres:NouveauMotDePasse@localhost:5432/teambuilding"
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL is not set")
+
+
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_recycle=300,
+    connect_args={"sslmode": "require"}  # SSL obligatoire sur Render
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -23,6 +35,3 @@ def create_tables():
     from database import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
-    
-    
-
