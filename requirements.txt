@@ -5,6 +5,7 @@ psycopg2-binary
 python-multipart
 passlib[bcrypt]
 python-jose[cryptography]
+ddgs
 smolagents
 mistralai
 python-docx
