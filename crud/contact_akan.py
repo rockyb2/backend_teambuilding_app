@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from database.models import ContactAkan
 from database.schemas import ContactAkanCreate
+import random
 
 def create_contact_akan(db: Session, contact: ContactAkanCreate):
     new_contact = ContactAkan(
@@ -19,3 +20,9 @@ def get_all_contacts_akan(db: Session):
 
 def get_contact_akan(db: Session, contact_id: int):
     return db.query(ContactAkan).filter(ContactAkan.id == contact_id).first()
+
+def tirer_au_sort_contact(db: Session):
+    contacts = get_all_contacts_akan(db)
+    if not contacts:
+        return None
+    return random.choice(contacts)

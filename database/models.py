@@ -106,6 +106,16 @@ class ContactAkan(Base):
     prenoms = Column(String(100), nullable=True)
     email = Column(String(150), unique=True, nullable=True)
     telephone = Column(String(20), nullable=True)
+    has_won = Column(Boolean, nullable=True, default=False)
+    
+
+class Lot(Base):
+    __tablename__ = "lot"
+    id = Column(Integer, primary_key=True, index=True)
+    nom = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    quantite = Column(Integer, nullable=False, default=1)
+    disponible = Column(Boolean, nullable=False, default=True)
     
 
 class Offre(Base):

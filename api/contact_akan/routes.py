@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database.connection import get_db
 from database.schemas import ContactAkanCreate, ContactAkanResponse
-from crud.contact_akan import create_contact_akan, get_all_contacts_akan, get_contact_akan
+from crud.contact_akan import create_contact_akan, get_all_contacts_akan, get_contact_akan, tirer_au_sort_contact
 
 router = APIRouter(prefix="/contact-akan", tags=["Contact Akan"])
 
@@ -20,3 +20,10 @@ def read_contact(contact_id: int, db: Session = Depends(get_db)):
     if not contact:
         raise HTTPException(status_code=404, detail="Contact introuvable")
     return contact
+
+@router.post("/tirage-au-sort", response_model=ContactAkanResponse)
+def tirage_au_sort(db: Session = Depends(get_db)):
+    gagnant = tirer_au_sort_contact(db)
+    if not gagnant:
+        raise HTTPException(status_code=404, detail="Aucun contact disponible pour le tirage")
+    return gagnant

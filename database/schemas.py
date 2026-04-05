@@ -15,7 +15,7 @@ class ContactAkanBase(BaseModel):
     prenoms: str
     email: str
     telephone: Optional[str] = None
-    
+    has_won: Optional[bool] = False
 
 class ContactAkanCreate(ContactAkanBase):
     pass
@@ -27,6 +27,24 @@ class ContactAkanResponse(ContactAkanBase):
 
     class Config:
         from_attributes = True
+
+
+class LotBase(BaseModel):
+    nom: str
+    description: Optional[str] = None
+    quantite: int = 1
+    disponible: bool = True
+    
+
+class LotCreate(LotBase):
+    pass
+
+class LotResponse(LotBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
 
 class ORMBaseModel(BaseModel):
     if ConfigDict is not None:

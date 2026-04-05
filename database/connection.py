@@ -13,12 +13,20 @@ if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL is not set")
 
+# Configuration SSL conditionnelle
+connect_args = {}
+if "localhost" in DATABASE_URL or "127.0.0.1" in DATABASE_URL:
+    # Pour les connexions locales, désactiver SSL
+    connect_args = {"sslmode": "disable"}
+else:
+    # Pour les environnements de production (comme Render), garder SSL
+    connect_args = {"sslmode": "require"}
 
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
     pool_recycle=300,
-    connect_args={"sslmode": "require"}  # SSL obligatoire sur Render
+    connect_args=connect_args
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
