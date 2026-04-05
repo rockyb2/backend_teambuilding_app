@@ -21,7 +21,7 @@ def read_contact(contact_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Contact introuvable")
     return contact
 
-@router.post("/tirage-au-sort", response_model=ContactAkanResponse)
+@router.post("/contact-akan/tirage-au-sort", response_model=ContactAkanResponse)
 def tirage_au_sort(db: Session = Depends(get_db)):
     gagnant = tirer_au_sort_contact(db)
     if not gagnant:
