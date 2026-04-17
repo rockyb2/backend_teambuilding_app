@@ -19,7 +19,7 @@ from api.utilisateurs import router as utilisateurs_router
 from api.uploads import router as uploads_router
 from api.agent.routes import router as agent_router
 from api.contact_akan.routes import router as contact_akan_router
-from api.lots.routes import router as lots_router
+
 
 
 def include_api_routes(app):
@@ -41,5 +41,5 @@ def include_api_routes(app):
     app.include_router(uploads_router)
     app.include_router(agent_router)
     app.include_router(contact_akan_router)
-    app.include_router(lots_router)
+
 

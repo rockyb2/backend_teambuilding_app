@@ -109,14 +109,9 @@ class ContactAkan(Base):
     has_won = Column(Boolean, nullable=True, default=False)
     
 
-class Lot(Base):
-    __tablename__ = "lot"
-    id = Column(Integer, primary_key=True, index=True)
-    nom = Column(String(100), nullable=False)
-    description = Column(Text, nullable=True)
-    quantite = Column(Integer, nullable=False, default=1)
-    disponible = Column(Boolean, nullable=False, default=True)
-    
+
+
+
 
 class Offre(Base):
     __tablename__ = "offre"
@@ -351,6 +346,56 @@ class DemandeTourisme(Base):
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
+
+class DemandeTourismeCustom(Base):
+    __tablename__ = "demandes_tourisme_custom"
+    __table_args__ = (
+        CheckConstraint("nombre_personne > 0", name="ck_demandes_tourisme_custom_nombre_personne_pos"),
+        CheckConstraint(
+            "statut IN ('nouvelle', 'en_cours_de_traitement', 'traitee', 'annulee')",
+            name="ck_demandes_tourisme_custom_statut",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    nom_client = Column(String(255), nullable=False)
+    prenoms_client = Column(String(255), nullable=False)
+    email_client = Column(String(255), nullable=False, index=True)
+    numero_telephone_client = Column(String(50), nullable=False)
+    nombre_personne = Column(Integer, nullable=False, default=1, server_default=text("1"))
+    nombre_jours = Column(Integer, nullable=True)
+    lieu_souhaite = Column(String(255), nullable=True)
+    attente_voyage = Column(Text, nullable=True)
+    statut = Column(
+        String(50),
+        nullable=False,
+        default="nouvelle",
+        server_default=text("'nouvelle'"),
+    )
+
+    @property
+    def nom(self) -> str:
+        return self.nom_client
+
+    @property
+    def prenom(self) -> str:
+        return self.prenoms_client
+
+    @property
+    def email(self) -> str:
+        return self.email_client
+
+    @property
+    def telephone(self) -> str:
+        return self.numero_telephone_client
+
+    @property
+    def nb_personnes(self) -> int:
+        return self.nombre_personne
+
+    @property
+    def nb_jours(self) -> int | None:
+        return self.nombre_jours
 
 class DemandeTeamBuilding(Base):
     __tablename__ = "demandes_team_building"

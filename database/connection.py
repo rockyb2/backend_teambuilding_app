@@ -5,7 +5,8 @@ from sqlalchemy.orm import sessionmaker
 
 from database.base import Base
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+# DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL ="postgresql+psycopg2://postgres:NouveauMotDePasse@localhost:5432/teambuilding"
 
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)

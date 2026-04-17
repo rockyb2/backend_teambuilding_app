@@ -29,21 +29,7 @@ class ContactAkanResponse(ContactAkanBase):
         from_attributes = True
 
 
-class LotBase(BaseModel):
-    nom: str
-    description: Optional[str] = None
-    quantite: int = 1
-    disponible: bool = True
-    
 
-class LotCreate(LotBase):
-    pass
-
-class LotResponse(LotBase):
-    id: int
-
-    class Config:
-        from_attributes = True
 
 
 class ORMBaseModel(BaseModel):
@@ -350,6 +336,8 @@ class DemandeContactCreate(DemandeContactBase):
     pass
 
 
+
+
 class DemandeContactRead(DemandeContactBase):
     id: int
     created_at: datetime
@@ -400,3 +388,22 @@ class UtilisateurUpdate(ORMBaseModel):
     image_utilisateur: Optional[str] = None
 
 
+class DemandeTourismeCustumerBase(ORMBaseModel):
+    prenom: str
+    nom: str
+    email: str
+    telephone: Optional[str] = None
+    nb_personnes: int = 1
+    nb_jours: Optional[int] = None
+    lieu_souhaite: Optional[str] = None
+    attente_voyage: Optional[str] = None
+    statut: Optional[str] = "nouvelle"
+
+
+class DemandeTourismeCustom(DemandeTourismeCustumerBase):
+    id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class DemandeTourismeCustumerCreate(DemandeTourismeCustumerBase):
+    pass

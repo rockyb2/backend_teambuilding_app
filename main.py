@@ -5,6 +5,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from core.env_loader import load_local_env
+
+load_local_env()
+
 from api import include_api_routes
 from database import models, schemas
 from database.connection import create_tables
