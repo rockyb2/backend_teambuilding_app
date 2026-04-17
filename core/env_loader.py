@@ -24,4 +24,5 @@ def load_local_env() -> None:
         ):
             value = value[1:-1]
 
-        os.environ[key] = value
+        if key not in os.environ:
+            os.environ[key] = value
