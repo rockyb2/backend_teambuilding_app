@@ -7,6 +7,7 @@ from api.dependencies import get_db
 from crud import demande_contact as crud_demande_contact
 from database.schemas import DemandeContactCreate, DemandeContactRead
 from services.email_service import build_contact_email, send_notification_email
+from security import require_module_access
 
 router = APIRouter(prefix="/api/demandes-contact", tags=["demandes contact"])
 
@@ -16,12 +17,21 @@ def _send_contact_notification(subject: str, body: str, html_body: str | None = 
 
 
 @router.get("", response_model=List[DemandeContactRead])
-def get_demandes_contact(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def get_demandes_contact(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_module_access("administration")),
+):
     return crud_demande_contact.get_demandes_contact(db, skip=skip, limit=limit)
 
 
 @router.get("/{demande_id}", response_model=DemandeContactRead)
-def get_demande_contact(demande_id: int, db: Session = Depends(get_db)):
+def get_demande_contact(
+    demande_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_module_access("administration")),
+):
     db_demande = crud_demande_contact.get_demande_contact(db, demande_id)
     if not db_demande:
         raise HTTPException(status_code=404, detail="Demande contact non trouvee")

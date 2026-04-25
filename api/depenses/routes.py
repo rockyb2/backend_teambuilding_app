@@ -10,8 +10,13 @@ from crud import depense as crud_depense
 from crud import activite as crud_activite
 from database.schemas import DepenseCreate, DepenseRead
 from api.dependencies import get_db
+from security import require_module_access
 
-router = APIRouter(prefix="/api/depenses", tags=["depenses"])
+router = APIRouter(
+    prefix="/api/depenses",
+    tags=["depenses"],
+    dependencies=[Depends(require_module_access("teambuilding"))],
+)
 
 
 @router.get("", response_model=List[DepenseRead])

@@ -10,8 +10,14 @@ from crud import client as crud_client
 from database.schemas import ClientCreate, ClientRead, ClientUpdate
 from database.models import Client
 from api.dependencies import get_db
+from security import require_module_access
 
-router = APIRouter(prefix="/api/clients", tags=["clients"])
+# All CRM client management endpoints are internal to the Team Building module.
+router = APIRouter(
+    prefix="/api/clients",
+    tags=["clients"],
+    dependencies=[Depends(require_module_access("teambuilding"))],
+)
 
 
 @router.get("", response_model=List[ClientRead])

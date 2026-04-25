@@ -1,9 +1,16 @@
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
-router = APIRouter(prefix="/api/uploads", tags=["uploads"])
+from security import require_module_access
+
+# Uploads are intended for internal CRM usage, mainly production/admin operations.
+router = APIRouter(
+    prefix="/api/uploads",
+    tags=["uploads"],
+    dependencies=[Depends(require_module_access("production"))],
+)
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB

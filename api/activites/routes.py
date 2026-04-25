@@ -11,8 +11,13 @@ from crud import offre as crud_offre
 from crud import site as crud_site
 from database.schemas import ActiviteCreate, ActiviteRead
 from api.dependencies import get_db
+from security import require_module_access
 
-router = APIRouter(prefix="/api/activites", tags=["activites"])
+router = APIRouter(
+    prefix="/api/activites",
+    tags=["activites"],
+    dependencies=[Depends(require_module_access("teambuilding"))],
+)
 
 
 @router.get("", response_model=List[ActiviteRead])

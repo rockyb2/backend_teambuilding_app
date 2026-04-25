@@ -10,8 +10,13 @@ from sqlalchemy.orm import Session
 from api.dependencies import get_db
 from crud import personnel as crud_personnel
 from database.schemas import PersonnelCreate, PersonnelRead, PersonnelUpdate
+from security import require_module_access
 
-router = APIRouter(prefix="/api/personnel", tags=["personnel"])
+router = APIRouter(
+    prefix="/api/personnel",
+    tags=["personnel"],
+    dependencies=[Depends(require_module_access("teambuilding"))],
+)
 
 
 @router.get("", response_model=List[PersonnelRead])

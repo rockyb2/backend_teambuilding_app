@@ -10,8 +10,14 @@ from crud import demande as crud_demande
 from crud import client as crud_client
 from database.schemas import DemandeCreate, DemandeRead
 from api.dependencies import get_db
+from security import require_module_access
 
-router = APIRouter(prefix="/api/demandes", tags=["demandes"])
+# Legacy internal demand endpoints are restricted to the Team Building back-office.
+router = APIRouter(
+    prefix="/api/demandes",
+    tags=["demandes"],
+    dependencies=[Depends(require_module_access("teambuilding"))],
+)
 
 
 @router.get("", response_model=List[DemandeRead])

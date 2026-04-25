@@ -11,6 +11,7 @@ from services.email_service import (
     build_tourism_booking_email,
     send_notification_email,
 )
+from security import require_module_access
 
 router = APIRouter(prefix="/api/demandes-tourisme", tags=["demandes tourisme"])
 
@@ -20,12 +21,31 @@ def _send_tourism_notification(subject: str, body: str, html_body: str | None = 
 
 
 @router.get("", response_model=List[DemandeTourismeRead])
-def get_demandes_tourisme(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def get_demandes_tourisme(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_module_access("tourisme")),
+):
     return crud_demande_tourisme.get_demandes_tourisme(db, skip=skip, limit=limit)
 
 
+@router.get("/custom", response_model=List[DemandeTourismeCustom])
+def get_demandes_tourisme_custom(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_module_access("tourisme")),
+):
+    return crud_demande_tourisme.get_demandes_tourisme_custom(db, skip=skip, limit=limit)
+
+
 @router.get("/{demande_id}", response_model=DemandeTourismeRead)
-def get_demande_tourisme(demande_id: int, db: Session = Depends(get_db)):
+def get_demande_tourisme(
+    demande_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_module_access("tourisme")),
+):
     db_demande = crud_demande_tourisme.get_demande_tourisme(db, demande_id)
     if not db_demande:
         raise HTTPException(status_code=404, detail="Demande tourisme non trouvee")

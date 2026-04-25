@@ -7,6 +7,7 @@ from api.dependencies import get_db
 from crud import demande_team_building as crud_demande_team_building
 from database.schemas import DemandeTeamBuildingCreate, DemandeTeamBuildingRead
 from services.email_service import build_team_building_email, send_notification_email
+from security import require_module_access
 
 router = APIRouter(prefix="/api/demandes-team-building", tags=["demandes team building"])
 
@@ -15,13 +16,32 @@ def _send_team_building_notification(subject: str, body: str, html_body: str | N
     send_notification_email(subject=subject, body=body, html_body=html_body, profile="TEAMBUILDING")
 
 
+@router.get("", response_model=List[DemandeTeamBuildingRead])
+def list_demandes_team_building(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_module_access("teambuilding")),
+):
+    return crud_demande_team_building.get_demandes_team_building(db, skip=skip, limit=limit)
+
+
 @router.get("/getDemande", response_model=List[DemandeTeamBuildingRead])
-def get_demandes_team_building(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def get_demandes_team_building(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_module_access("teambuilding")),
+):
     return crud_demande_team_building.get_demandes_team_building(db, skip=skip, limit=limit)
 
 
 @router.get("/{demande_id}", response_model=DemandeTeamBuildingRead)
-def get_demande_team_building(demande_id: int, db: Session = Depends(get_db)):
+def get_demande_team_building(
+    demande_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_module_access("teambuilding")),
+):
     db_demande = crud_demande_team_building.get_demande_team_building(db, demande_id)
     if not db_demande:
         raise HTTPException(status_code=404, detail="Demande team building non trouvee")

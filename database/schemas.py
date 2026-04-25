@@ -372,6 +372,14 @@ class RoleRead(ORMBaseModel):
     nom_role: str
 
 
+class RoleCreate(ORMBaseModel):
+    nom_role: str
+
+
+class RoleUpdate(ORMBaseModel):
+    nom_role: Optional[str] = None
+
+
 class UtilisateurRead(UtilisateurBase):
     id_utilisateur: int
     date_creation: datetime
@@ -386,6 +394,39 @@ class UtilisateurUpdate(ORMBaseModel):
     actif: Optional[bool] = None
     id_utilisateur_create: Optional[int] = None
     image_utilisateur: Optional[str] = None
+
+
+class LoginRequest(ORMBaseModel):
+    email: str
+    password: str
+
+
+class RefreshTokenRequest(ORMBaseModel):
+    refresh_token: str
+
+
+class AuthUserResponse(ORMBaseModel):
+    id_utilisateur: int
+    nom: str
+    prenom: Optional[str] = None
+    email: str
+    role: Optional[str] = None
+    id_role: Optional[int] = None
+    actif: Optional[bool] = True
+    date_creation: Optional[datetime] = None
+    image_utilisateur: Optional[str] = None
+
+
+class LoginResponse(ORMBaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    user: AuthUserResponse
+
+
+class RefreshTokenResponse(ORMBaseModel):
+    access_token: str
+    token_type: str = "bearer"
 
 
 class DemandeTourismeCustumerBase(ORMBaseModel):

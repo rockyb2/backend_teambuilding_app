@@ -47,6 +47,18 @@ def get_demandes_tourisme(db: Session, skip: int = 0, limit: int = 100) -> list[
     )
 
 
+def get_demandes_tourisme_custom(
+    db: Session, skip: int = 0, limit: int = 100
+) -> list[DemandeTourismeCustom]:
+    return (
+        db.query(DemandeTourismeCustom)
+        .order_by(DemandeTourismeCustom.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
 def create_demande_tourisme(db: Session, payload: DemandeTourismeCreate) -> DemandeTourisme:
     db_demande = DemandeTourisme(**_model_dump(payload))
     db.add(db_demande)

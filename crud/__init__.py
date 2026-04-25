@@ -17,7 +17,7 @@ from crud import (
     affectation,
     depense,
     contact_akan,
-    
+    role,
     utilisateur,
 )
 
@@ -36,6 +36,7 @@ __all__ = [
     "affectation",
     "depense",
     "contact_akan",
+    "role",
     "utilisateur",
 ]
 

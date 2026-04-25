@@ -11,8 +11,13 @@ from crud import activite as crud_activite
 from crud import jeu as crud_jeu
 from database.schemas import ActiviteJeuCreate, ActiviteJeuRead
 from api.dependencies import get_db
+from security import require_module_access
 
-router = APIRouter(prefix="/api/activites_jeux", tags=["activites_jeux"])
+router = APIRouter(
+    prefix="/api/activites_jeux",
+    tags=["activites_jeux"],
+    dependencies=[Depends(require_module_access("teambuilding"))],
+)
 
 
 @router.get("", response_model=List[ActiviteJeuRead])

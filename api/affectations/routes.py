@@ -11,8 +11,13 @@ from crud import activite as crud_activite
 from crud import personnel as crud_personnel
 from database.schemas import AffectationCreate, AffectationRead
 from api.dependencies import get_db
+from security import require_module_access
 
-router = APIRouter(prefix="/api/affectations", tags=["affectations"])
+router = APIRouter(
+    prefix="/api/affectations",
+    tags=["affectations"],
+    dependencies=[Depends(require_module_access("teambuilding"))],
+)
 
 
 @router.get("", response_model=List[AffectationRead])

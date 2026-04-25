@@ -10,8 +10,13 @@ from crud import offre as crud_offre
 from crud import demande as crud_demande
 from database.schemas import OffreCreate, OffreRead
 from api.dependencies import get_db
+from security import require_module_access
 
-router = APIRouter(prefix="/api/offres", tags=["offres"])
+router = APIRouter(
+    prefix="/api/offres",
+    tags=["offres"],
+    dependencies=[Depends(require_module_access("teambuilding"))],
+)
 
 
 @router.get("", response_model=List[OffreRead])

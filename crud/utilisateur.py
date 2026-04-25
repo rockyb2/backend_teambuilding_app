@@ -20,7 +20,12 @@ def _resolve_role_id(db: Session, role: Optional[str] = None, id_role: Optional[
             raise ValueError("Role introuvable")
         return db_role.id_role
 
-    role_name = role or "admin"
+    # We intentionally require an explicit role choice during user creation.
+    # It avoids accidentally creating privileged accounts with an implicit default.
+    role_name = role
+    if not role_name:
+        raise ValueError("Un role explicite est obligatoire")
+
     db_role = db.query(Role).filter(Role.nom_role == role_name).first()
     if not db_role:
         raise ValueError(f"Role '{role_name}' introuvable")
