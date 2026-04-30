@@ -1,8 +1,8 @@
 ﻿from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 try:
     from pydantic import ConfigDict
@@ -38,6 +38,31 @@ class ORMBaseModel(BaseModel):
     else:  # pragma: no cover
         class Config:
             orm_mode = True
+
+
+DemandeTourismeStatut = Literal[
+    "nouvelle",
+    "en_traitement",
+    "devis_envoye",
+    "en_attente_reponse_client",
+    "relance_envoyee",
+    "validee",
+    "annulee",
+    "refusee",
+    "terminee",
+]
+
+STATUTS_DEMANDE_TOURISME: tuple[str, ...] = (
+    "nouvelle",
+    "en_traitement",
+    "devis_envoye",
+    "en_attente_reponse_client",
+    "relance_envoyee",
+    "validee",
+    "annulee",
+    "refusee",
+    "terminee",
+)
 
 
 class ClientBase(ORMBaseModel):
@@ -262,7 +287,7 @@ class DemandeTourismeBase(ORMBaseModel):
     note_client: Optional[str] = None
     prix_total_estime: Optional[Decimal] = Decimal("0")
     source: Optional[str] = "site_web"
-    statut: Optional[str] = "nouvelle"
+    statut: Optional[DemandeTourismeStatut] = "nouvelle"
 
 
 class DemandeTourismeCreate(DemandeTourismeBase):
@@ -271,8 +296,92 @@ class DemandeTourismeCreate(DemandeTourismeBase):
 
 class DemandeTourismeRead(DemandeTourismeBase):
     id: int
+    statut_modifie_le: Optional[datetime] = None
+    statut_modifie_par_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
+
+
+class DemandeTourismeStatutUpdate(ORMBaseModel):
+    statut: DemandeTourismeStatut
+    commentaire: Optional[str] = None
+
+
+class HistoriqueStatutDemandeTourismeRead(ORMBaseModel):
+    id: int
+    demande_tourisme_id: Optional[int] = None
+    demande_tourisme_custom_id: Optional[int] = None
+    ancien_statut: Optional[str] = None
+    nouveau_statut: str
+    commentaire: Optional[str] = None
+    modifie_par_id: Optional[int] = None
+    modifie_le: datetime
+
+
+class CircuitTouristiqueBase(ORMBaseModel):
+    titre: str
+    lieu: Optional[str] = None
+    thematique: Optional[str] = None
+    description: Optional[str] = None
+    details: list[Any] = Field(default_factory=list)
+    duree: Optional[str] = None
+    prix_base: Decimal = Decimal("0")
+    categorie: Literal["local", "international"] = "local"
+    type_circuit: Optional[str] = None
+    images: list[Any] = Field(default_factory=list)
+    itineraire: list[Any] = Field(default_factory=list)
+    formules: list[Any] = Field(default_factory=list)
+    inclus: list[Any] = Field(default_factory=list)
+    non_inclus: list[Any] = Field(default_factory=list)
+    conditions_annulation: list[Any] = Field(default_factory=list)
+    actif: bool = True
+    publie: bool = False
+
+
+class CircuitTouristiqueCreate(CircuitTouristiqueBase):
+    pass
+
+
+class CircuitTouristiqueUpdate(ORMBaseModel):
+    titre: Optional[str] = None
+    lieu: Optional[str] = None
+    thematique: Optional[str] = None
+    description: Optional[str] = None
+    details: Optional[list[Any]] = None
+    duree: Optional[str] = None
+    prix_base: Optional[Decimal] = None
+    categorie: Optional[Literal["local", "international"]] = None
+    type_circuit: Optional[str] = None
+    images: Optional[list[Any]] = None
+    itineraire: Optional[list[Any]] = None
+    formules: Optional[list[Any]] = None
+    inclus: Optional[list[Any]] = None
+    non_inclus: Optional[list[Any]] = None
+    conditions_annulation: Optional[list[Any]] = None
+    actif: Optional[bool] = None
+    publie: Optional[bool] = None
+
+
+class CircuitTouristiqueRead(CircuitTouristiqueBase):
+    id: int
+    created_by_id: Optional[int] = None
+    updated_by_id: Optional[int] = None
+    created_by_nom_complet: Optional[str] = None
+    updated_by_nom_complet: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    title: str
+    location: Optional[str] = None
+    thematic: Optional[str] = None
+    duration: Optional[str] = None
+    price: Decimal
+    category: str
+    type: Optional[str] = None
+    itinerary: list[Any] = Field(default_factory=list)
+    budget: list[Any] = Field(default_factory=list)
+    included: list[Any] = Field(default_factory=list)
+    notIncluded: list[Any] = Field(default_factory=list)
+    cancellation: list[Any] = Field(default_factory=list)
 
 
 class DemandeTeamBuildingCadreBase(ORMBaseModel):
@@ -438,11 +547,13 @@ class DemandeTourismeCustumerBase(ORMBaseModel):
     nb_jours: Optional[int] = None
     lieu_souhaite: Optional[str] = None
     attente_voyage: Optional[str] = None
-    statut: Optional[str] = "nouvelle"
+    statut: Optional[DemandeTourismeStatut] = "nouvelle"
 
 
 class DemandeTourismeCustom(DemandeTourismeCustumerBase):
     id: int
+    statut_modifie_le: Optional[datetime] = None
+    statut_modifie_par_id: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

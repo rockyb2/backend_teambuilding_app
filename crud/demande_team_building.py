@@ -48,3 +48,19 @@ def create_demande_team_building(
     db.commit()
     db.refresh(db_demande)
     return get_demande_team_building(db, db_demande.id)
+
+
+def update_demande_team_building_statut(
+    db: Session,
+    db_demande: DemandeTeamBuilding,
+    statut: str,
+) -> DemandeTeamBuilding:
+    db_demande.statut = statut
+    db.commit()
+    db.refresh(db_demande)
+    return get_demande_team_building(db, db_demande.id) or db_demande
+
+
+def delete_demande_team_building(db: Session, db_demande: DemandeTeamBuilding) -> None:
+    db.delete(db_demande)
+    db.commit()

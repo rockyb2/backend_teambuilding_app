@@ -17,9 +17,25 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
 from database.base import Base
+
+
+DEMANDE_TOURISME_STATUT_CHECK = (
+    "statut IN ("
+    "'nouvelle',"
+    "'en_traitement',"
+    "'devis_envoye',"
+    "'en_attente_reponse_client',"
+    "'relance_envoyee',"
+    "'validee',"
+    "'annulee',"
+    "'refusee',"
+    "'terminee'"
+    ")"
+)
 
 
 class Client(Base):
@@ -108,9 +124,6 @@ class ContactAkan(Base):
     telephone = Column(String(20), nullable=True)
     has_won = Column(Boolean, nullable=True, default=False)
     
-
-
-
 
 
 class Offre(Base):
@@ -315,10 +328,7 @@ class DemandeTourisme(Base):
     __tablename__ = "demandes_tourisme"
     __table_args__ = (
         CheckConstraint("nombre_voyageurs > 0", name="ck_demandes_tourisme_nombre_voyageurs_pos"),
-        CheckConstraint(
-            "statut IN ('nouvelle', 'contactee', 'devis_envoye', 'confirmee', 'annulee')",
-            name="ck_demandes_tourisme_statut",
-        ),
+        CheckConstraint(DEMANDE_TOURISME_STATUT_CHECK, name="ck_demandes_tourisme_statut"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -338,23 +348,28 @@ class DemandeTourisme(Base):
     prix_total_estime = Column(Numeric(12, 2), nullable=False, default=0, server_default=text("0"))
     source = Column(String(30), nullable=False, default="site_web", server_default=text("'site_web'"))
     statut = Column(
-        String(30),
+        String(50),
         nullable=False,
         default="nouvelle",
         server_default=text("'nouvelle'"),
     )
+    statut_modifie_le = Column(DateTime, nullable=True)
+    statut_modifie_par_id = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    statut_modifie_par = relationship("Utilisateur", foreign_keys=[statut_modifie_par_id])
 
 
 class DemandeTourismeCustom(Base):
     __tablename__ = "demandes_tourisme_custom"
     __table_args__ = (
         CheckConstraint("nombre_personne > 0", name="ck_demandes_tourisme_custom_nombre_personne_pos"),
-        CheckConstraint(
-            "statut IN ('nouvelle', 'en_cours_de_traitement', 'traitee', 'annulee')",
-            name="ck_demandes_tourisme_custom_statut",
-        ),
+        CheckConstraint(DEMANDE_TOURISME_STATUT_CHECK, name="ck_demandes_tourisme_custom_statut"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -372,6 +387,14 @@ class DemandeTourismeCustom(Base):
         default="nouvelle",
         server_default=text("'nouvelle'"),
     )
+    statut_modifie_le = Column(DateTime, nullable=True)
+    statut_modifie_par_id = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    statut_modifie_par = relationship("Utilisateur", foreign_keys=[statut_modifie_par_id])
 
     @property
     def nom(self) -> str:
@@ -396,6 +419,142 @@ class DemandeTourismeCustom(Base):
     @property
     def nb_jours(self) -> int | None:
         return self.nombre_jours
+
+
+class HistoriqueStatutDemandeTourisme(Base):
+    __tablename__ = "historique_statut_demandes_tourisme"
+    __table_args__ = (
+        CheckConstraint(
+            (
+                "(demande_tourisme_id IS NOT NULL AND demande_tourisme_custom_id IS NULL) "
+                "OR "
+                "(demande_tourisme_id IS NULL AND demande_tourisme_custom_id IS NOT NULL)"
+            ),
+            name="ck_historique_statut_une_seule_demande_tourisme",
+        ),
+        CheckConstraint(
+            "nouveau_statut IN ("
+            "'nouvelle',"
+            "'en_traitement',"
+            "'devis_envoye',"
+            "'en_attente_reponse_client',"
+            "'relance_envoyee',"
+            "'validee',"
+            "'annulee',"
+            "'refusee',"
+            "'terminee'"
+            ")",
+            name="ck_historique_statut_demande_tourisme_nouveau_statut",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    demande_tourisme_id = Column(
+        Integer,
+        ForeignKey("demandes_tourisme.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    demande_tourisme_custom_id = Column(
+        Integer,
+        ForeignKey("demandes_tourisme_custom.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    ancien_statut = Column(String(50), nullable=True)
+    nouveau_statut = Column(String(50), nullable=False)
+    commentaire = Column(Text, nullable=True)
+    modifie_par_id = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
+    modifie_le = Column(DateTime, nullable=False, server_default=func.now())
+
+    demande_tourisme = relationship("DemandeTourisme")
+    demande_tourisme_custom = relationship("DemandeTourismeCustom")
+    modifie_par = relationship("Utilisateur", foreign_keys=[modifie_par_id])
+
+
+class CircuitTouristique(Base):
+    __tablename__ = "circuits_touristiques"
+    __table_args__ = (
+        CheckConstraint("prix_base >= 0", name="ck_circuits_touristiques_prix_base_non_negatif"),
+        CheckConstraint("categorie IN ('local', 'international')", name="ck_circuits_touristiques_categorie"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    titre = Column(String(255), nullable=False)
+    lieu = Column(String(255), nullable=True)
+    thematique = Column(String(255), nullable=True)
+    description = Column(Text, nullable=True)
+    details = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    duree = Column(String(120), nullable=True)
+    prix_base = Column(Numeric(12, 2), nullable=False, default=0, server_default=text("0"))
+    categorie = Column(String(50), nullable=False, default="local", server_default=text("'local'"))
+    type_circuit = Column(String(100), nullable=True)
+    images = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    itineraire = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    formules = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    inclus = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    non_inclus = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    conditions_annulation = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    actif = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    publie = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    created_by_id = Column(Integer, ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"), nullable=True)
+    updated_by_id = Column(Integer, ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    created_by = relationship("Utilisateur", foreign_keys=[created_by_id])
+    updated_by = relationship("Utilisateur", foreign_keys=[updated_by_id])
+
+    @property
+    def title(self) -> str:
+        return self.titre
+
+    @property
+    def location(self) -> str | None:
+        return self.lieu
+
+    @property
+    def thematic(self) -> str | None:
+        return self.thematique
+
+    @property
+    def duration(self) -> str | None:
+        return self.duree
+
+    @property
+    def price(self):
+        return self.prix_base
+
+    @property
+    def category(self) -> str:
+        return self.categorie
+
+    @property
+    def type(self) -> str | None:
+        return self.type_circuit
+
+    @property
+    def itinerary(self):
+        return self.itineraire
+
+    @property
+    def budget(self):
+        return self.formules
+
+    @property
+    def included(self):
+        return self.inclus
+
+    @property
+    def notIncluded(self):
+        return self.non_inclus
+
+    @property
+    def cancellation(self):
+        return self.conditions_annulation
+
 
 class DemandeTeamBuilding(Base):
     __tablename__ = "demandes_team_building"

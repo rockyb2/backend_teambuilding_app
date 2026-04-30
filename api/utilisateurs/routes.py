@@ -52,7 +52,13 @@ def get_utilisateurs(
     db: Session = Depends(get_db),
     current_user=Depends(require_user_management_access),
 ):
-    return crud_utilisateur.get_utilisateurs(db, skip=skip, limit=limit)
+    utilisateurs = crud_utilisateur.get_utilisateurs(db, skip=skip, limit=limit)
+    current_user_id = getattr(current_user, "id_utilisateur", None)
+    return [
+        utilisateur
+        for utilisateur in utilisateurs
+        if utilisateur.id_utilisateur != current_user_id
+    ]
 
 
 @router.get("/actifs", response_model=List[UtilisateurRead])
@@ -62,7 +68,13 @@ def get_utilisateurs_actifs(
     db: Session = Depends(get_db),
     current_user=Depends(require_user_management_access),
 ):
-    return crud_utilisateur.get_utilisateurs_actifs(db, skip=skip, limit=limit)
+    utilisateurs = crud_utilisateur.get_utilisateurs_actifs(db, skip=skip, limit=limit)
+    current_user_id = getattr(current_user, "id_utilisateur", None)
+    return [
+        utilisateur
+        for utilisateur in utilisateurs
+        if utilisateur.id_utilisateur != current_user_id
+    ]
 
 
 @router.get("/role/{role}", response_model=List[UtilisateurRead])
@@ -73,7 +85,13 @@ def get_utilisateurs_by_role(
     db: Session = Depends(get_db),
     current_user=Depends(require_user_management_access),
 ):
-    return crud_utilisateur.get_utilisateurs_by_role(db, role, skip=skip, limit=limit)
+    utilisateurs = crud_utilisateur.get_utilisateurs_by_role(db, role, skip=skip, limit=limit)
+    current_user_id = getattr(current_user, "id_utilisateur", None)
+    return [
+        utilisateur
+        for utilisateur in utilisateurs
+        if utilisateur.id_utilisateur != current_user_id
+    ]
 
 
 @router.get("/{utilisateur_id}", response_model=UtilisateurRead)
@@ -153,11 +171,14 @@ def delete_utilisateur(
     db: Session = Depends(get_db),
     current_user=Depends(require_user_management_access),
 ):
+    if not is_super_admin(current_user):
+        raise HTTPException(status_code=403, detail="Seul un super_admin peut supprimer un utilisateur")
+
     db_utilisateur = crud_utilisateur.get_utilisateur(db, utilisateur_id)
     if not db_utilisateur:
         raise HTTPException(status_code=404, detail="Utilisateur non trouve")
 
-    if not is_super_admin(current_user) and normalize_role_name(db_utilisateur.role) == "super_admin":
+    if normalize_role_name(db_utilisateur.role) == "super_admin":
         raise HTTPException(status_code=403, detail="Vous ne pouvez pas supprimer un super_admin")
 
     crud_utilisateur.delete_utilisateur(db, db_utilisateur)

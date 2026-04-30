@@ -29,6 +29,7 @@ def get_allowed_origins() -> list[str]:
 
 
 allowed_origins = get_allowed_origins()
+local_dev_origin_regex = r"https?://(localhost|127\.0\.0\.1)(:\d+)?"
 
 app = FastAPI(
     title="Team Building Management API",
@@ -40,6 +41,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=local_dev_origin_regex,
     allow_credentials="*" not in allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
