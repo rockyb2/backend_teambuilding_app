@@ -89,6 +89,23 @@ def update_demande_tourisme_custom_statut(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+@router.put("/custom/{demande_id}", response_model=DemandeTourismeCustom)
+def update_demande_tourisme_custom(
+    demande_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_module_access("tourisme")),
+):
+    db_demande = crud_demande_tourisme.get_demande_tourisme_custom(db, demande_id)
+    if not db_demande:
+        raise HTTPException(status_code=404, detail="Demande tourisme personnalisee non trouvee")
+
+    try:
+        return crud_demande_tourisme.update_demande_tourisme_custom(db, db_demande, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @router.get(
     "/custom/{demande_id}/historique",
     response_model=List[HistoriqueStatutDemandeTourismeRead],
@@ -150,6 +167,20 @@ def update_demande_tourisme_statut(
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.put("/{demande_id}", response_model=DemandeTourismeRead)
+def update_demande_tourisme(
+    demande_id: int,
+    payload: DemandeTourismeCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_module_access("tourisme")),
+):
+    db_demande = crud_demande_tourisme.get_demande_tourisme(db, demande_id)
+    if not db_demande:
+        raise HTTPException(status_code=404, detail="Demande tourisme non trouvee")
+
+    return crud_demande_tourisme.update_demande_tourisme(db, db_demande, payload)
 
 
 @router.get(

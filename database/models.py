@@ -395,6 +395,7 @@ class DemandeTourismeCustom(Base):
     )
 
     statut_modifie_par = relationship("Utilisateur", foreign_keys=[statut_modifie_par_id])
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
 
     @property
     def nom(self) -> str:

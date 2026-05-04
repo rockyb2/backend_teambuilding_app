@@ -74,6 +74,20 @@ def update_demande_team_building_statut(
     return crud_demande_team_building.update_demande_team_building_statut(db, db_demande, statut)
 
 
+@router.put("/{demande_id}", response_model=DemandeTeamBuildingRead)
+def update_demande_team_building(
+    demande_id: int,
+    payload: DemandeTeamBuildingCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_module_access("teambuilding")),
+):
+    db_demande = crud_demande_team_building.get_demande_team_building(db, demande_id)
+    if not db_demande:
+        raise HTTPException(status_code=404, detail="Demande team building non trouvee")
+
+    return crud_demande_team_building.update_demande_team_building(db, db_demande, payload)
+
+
 @router.delete("/{demande_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_demande_team_building(
     demande_id: int,

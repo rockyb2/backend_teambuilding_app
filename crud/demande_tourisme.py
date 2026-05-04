@@ -82,11 +82,43 @@ def create_demande_tourisme(db: Session, payload: DemandeTourismeCreate) -> Dema
     return db_demande
 
 
+def update_demande_tourisme(
+    db: Session,
+    db_demande: DemandeTourisme,
+    payload: DemandeTourismeCreate | dict,
+) -> DemandeTourisme:
+    data = _model_dump(payload, exclude_unset=True) if not isinstance(payload, dict) else dict(payload)
+
+    for key, value in data.items():
+        if hasattr(db_demande, key):
+            setattr(db_demande, key, value)
+
+    db.commit()
+    db.refresh(db_demande)
+    return db_demande
+
+
 def create_demande_tourisme_custom(
     db: Session, payload: DemandeTourismeCustumerCreate | dict
 ) -> DemandeTourismeCustom:
     db_demande = DemandeTourismeCustom(**_normalize_custom_tourism_payload(payload))
     db.add(db_demande)
+    db.commit()
+    db.refresh(db_demande)
+    return db_demande
+
+
+def update_demande_tourisme_custom(
+    db: Session,
+    db_demande: DemandeTourismeCustom,
+    payload: DemandeTourismeCustumerCreate | dict,
+) -> DemandeTourismeCustom:
+    data = _normalize_custom_tourism_payload(payload)
+
+    for key, value in data.items():
+        if hasattr(db_demande, key):
+            setattr(db_demande, key, value)
+
     db.commit()
     db.refresh(db_demande)
     return db_demande
