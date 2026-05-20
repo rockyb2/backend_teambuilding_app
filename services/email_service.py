@@ -67,7 +67,7 @@ def send_email(
     if not smtp_host or not smtp_username or not smtp_password or not from_email:
         raise ValueError("Configuration SMTP incomplete")
 
-    message = MIMEMultipart()
+    message = MIMEMultipart("alternative") if html_body else MIMEMultipart()
     message["From"] = from_email
     message["To"] = ", ".join(recipients)
     message["Subject"] = subject
