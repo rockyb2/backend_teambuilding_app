@@ -266,3 +266,25 @@ def build_contact_email(db_demande) -> tuple[str, str, str]:
         accent="#2563eb",
     )
     return subject, body, html_body
+
+
+def build_newsletter_subscription_email(db_subscription) -> tuple[str, str, str]:
+    rows = [
+        ("Email", db_subscription.email),
+        ("Langue", db_subscription.langue),
+        ("Source", db_subscription.source),
+        ("Consentement", "Oui" if db_subscription.consentement else "Non"),
+        ("Statut", "Actif" if db_subscription.actif else "Inactif"),
+    ]
+    subject = f"Nouvelle inscription newsletter - {db_subscription.email}"
+    body = "Nouvelle inscription newsletter\n\n" + "\n".join(
+        f"{label} : {_normalize_value(value)}" for label, value in rows
+    )
+    html_body = _render_email_html(
+        title="Nouvelle inscription newsletter",
+        subtitle="Un visiteur vient de s'inscrire a la newsletter depuis le site.",
+        badge="Newsletter",
+        rows=rows,
+        accent="#f27d26",
+    )
+    return subject, body, html_body

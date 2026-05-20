@@ -17,7 +17,11 @@ CLOUDINARY_FOLDER = os.getenv("CLOUDINARY_UPLOAD_FOLDER", "ivoirtrips/circuits")
 
 
 def require_upload_access(current_user=Depends(get_current_user)):
-    if user_can_access_module(current_user, "production") or user_can_access_module(current_user, "tourisme"):
+    if (
+        user_can_access_module(current_user, "production")
+        or user_can_access_module(current_user, "tourisme")
+        or user_can_access_module(current_user, "teambuilding")
+    ):
         return current_user
 
     raise HTTPException(

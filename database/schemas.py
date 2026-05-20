@@ -131,6 +131,22 @@ class OffreRead(OffreBase):
     id_offre: int
 
 
+class SiteImageBase(ORMBaseModel):
+    image_url: str
+    alt: Optional[str] = None
+    ordre: Optional[int] = 0
+
+
+class SiteImageCreate(SiteImageBase):
+    pass
+
+
+class SiteImageRead(SiteImageBase):
+    id: int
+    site_id: int
+    created_at: datetime
+
+
 class SiteBase(ORMBaseModel):
     nom_site: str
     localisation: Optional[str] = None
@@ -139,6 +155,7 @@ class SiteBase(ORMBaseModel):
     image_site: Optional[str] = None
     date_creation: Optional[datetime] = None
     id_utilisateur_create: Optional[int] = None
+    images: list[SiteImageCreate] = Field(default_factory=list)
 
 
 class SiteCreate(SiteBase):
@@ -147,6 +164,7 @@ class SiteCreate(SiteBase):
 
 class SiteRead(SiteBase):
     id_site: int
+    images: list[SiteImageRead] = Field(default_factory=list)
 
 
 class ActiviteBase(ORMBaseModel):
@@ -175,7 +193,9 @@ class JeuBase(ORMBaseModel):
     duree: Optional[int] = None
     nb_min_participants: Optional[int] = None
     nb_max_participants: Optional[int] = None
+    nb_participant_max: Optional[int] = None
     materiel_requis: Optional[str] = None
+    image_jeux: Optional[str] = None
     date_creation: Optional[datetime] = None
     id_utilisateur_create: Optional[int] = None
 
@@ -233,6 +253,38 @@ class PersonnelUpdate(ORMBaseModel):
 
 class PersonnelRead(PersonnelBase):
     id_personnel: int
+
+
+class BenevoleBase(ORMBaseModel):
+    nom: str
+    prenoms: str
+    email: str
+    telephone: Optional[str] = None
+    lieu_habitation: Optional[str] = None
+    experience: Optional[str] = None
+    actif: Optional[bool] = True
+    id_utilisateur_create: Optional[int] = None
+
+
+class BenevoleCreate(BenevoleBase):
+    pass
+
+
+class BenevoleUpdate(ORMBaseModel):
+    nom: Optional[str] = None
+    prenoms: Optional[str] = None
+    email: Optional[str] = None
+    telephone: Optional[str] = None
+    lieu_habitation: Optional[str] = None
+    experience: Optional[str] = None
+    actif: Optional[bool] = None
+    id_utilisateur_create: Optional[int] = None
+
+
+class BenevoleRead(BenevoleBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
 
 
 class AffectationBase(ORMBaseModel):
@@ -449,6 +501,32 @@ class DemandeContactCreate(DemandeContactBase):
 
 class DemandeContactRead(DemandeContactBase):
     id: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class NewsletterSubscriptionBase(ORMBaseModel):
+    email: str
+    langue: Optional[str] = None
+    source: Optional[str] = "site_web"
+    consentement: bool = True
+
+
+class NewsletterSubscriptionCreate(NewsletterSubscriptionBase):
+    pass
+
+
+class NewsletterSubscriptionUpdate(ORMBaseModel):
+    email: Optional[str] = None
+    langue: Optional[str] = None
+    source: Optional[str] = None
+    consentement: Optional[bool] = None
+    actif: Optional[bool] = None
+
+
+class NewsletterSubscriptionRead(NewsletterSubscriptionBase):
+    id: int
+    actif: bool
     created_at: datetime
     updated_at: datetime
 

@@ -12,9 +12,11 @@ from api.activites_jeux import router as activites_jeux_router
 from api.personnel import router as personnel_router
 from api.affectations import router as affectations_router
 from api.depenses import router as depenses_router
+from api.benevoles import router as benevoles_router
 from api.demandes_contact import router as demandes_contact_router
 from api.demandes_team_building import router as demandes_team_building_router
 from api.demandes_tourisme import router as demandes_tourisme_router
+from api.newsletter import router as newsletter_router
 from api.circuits_touristiques import router as circuits_touristiques_router
 from api.utilisateurs import router as utilisateurs_router
 from api.role import router as roles_router
@@ -36,9 +38,11 @@ def include_api_routes(app):
     app.include_router(personnel_router)
     app.include_router(affectations_router)
     app.include_router(depenses_router)
+    app.include_router(benevoles_router)
     app.include_router(demandes_contact_router)
     app.include_router(demandes_team_building_router)
     app.include_router(demandes_tourisme_router)
+    app.include_router(newsletter_router)
     app.include_router(circuits_touristiques_router)
     app.include_router(utilisateurs_router)
     app.include_router(roles_router)

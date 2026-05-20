@@ -37,9 +37,10 @@ def create_personnel(db: Session, payload: PersonnelCreate) -> Personnel:
 
 
 def update_personnel(db: Session, db_personnel: Personnel, payload: dict) -> Personnel:
-    updates = {k: v for k, v in payload.items() if v is not None}
+    updates = dict(payload)
     for key, value in updates.items():
-        setattr(db_personnel, key, value)
+        if hasattr(db_personnel, key):
+            setattr(db_personnel, key, value)
     db.commit()
     db.refresh(db_personnel)
     return db_personnel
