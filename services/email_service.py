@@ -62,10 +62,10 @@ def send_email(
 
     recipients = [email.strip() for email in to_emails if email and email.strip()]
     if not recipients:
-        raise ValueError("Aucun destinataire email valide n'a ete fourni")
+        raise ValueError("Aucun destinataire e-mail valide n'a été fourni")
 
     if not smtp_host or not smtp_username or not smtp_password or not from_email:
-        raise ValueError("Configuration SMTP incomplete")
+        raise ValueError("Configuration SMTP incomplète")
 
     message = MIMEMultipart("alternative") if html_body else MIMEMultipart()
     message["From"] = from_email
@@ -111,9 +111,9 @@ def send_notification_email(
 
 def _normalize_value(value) -> str:
     if value is None:
-        return "Non precise"
+        return "Non précisé"
     text = str(value).strip()
-    return text or "Non precise"
+    return text or "Non précisé"
 
 
 def _render_email_html(title: str, subtitle: str, badge: str, rows: list[tuple[str, str]], accent: str = "#f27d26") -> str:
@@ -148,7 +148,7 @@ def _render_email_html(title: str, subtitle: str, badge: str, rows: list[tuple[s
           </table>
         </div>
         <div style="padding:20px 40px 32px;color:#94a3b8;font-size:12px;line-height:1.6;border-top:1px solid #e2e8f0;background:#f8fafc;">
-          Message genere automatiquement depuis le site IVOIR TRIPS.
+          Message généré automatiquement depuis le site IVOIR TRIPS.
         </div>
       </div>
     </div>
@@ -162,23 +162,23 @@ def build_tourism_booking_email(db_demande) -> tuple[str, str, str]:
     rows = [
         ("Circuit", db_demande.titre_circuit),
         ("Lieu", db_demande.lieu_circuit),
-        ("Duree", db_demande.duree_circuit),
+        ("Durée", db_demande.duree_circuit),
         ("Formule", db_demande.formule_choisie),
         ("Prix formule", db_demande.prix_formule),
-        ("Date souhaitee", db_demande.date_depart_souhaitee),
-        ("Prenom", db_demande.prenom),
+        ("Date souhaitée", db_demande.date_depart_souhaitee),
+        ("Prénom", db_demande.prenom),
         ("Nom", db_demande.nom),
-        ("Telephone", db_demande.telephone),
-        ("Email", db_demande.email),
+        ("Téléphone", db_demande.telephone),
+        ("E-mail", db_demande.email),
         ("Nombre de voyageurs", db_demande.nombre_voyageurs),
-        ("Prix total estime", db_demande.prix_total_estime),
+        ("Prix total estimé", db_demande.prix_total_estime),
         ("Statut", db_demande.statut),
-        ("Note client", db_demande.note_client or "Aucune precision complementaire"),
+        ("Note client", db_demande.note_client or "Aucune précision complémentaire"),
     ]
     body = "Nouvelle demande tourisme\n\n" + "\n".join(f"{label} : {_normalize_value(value)}" for label, value in rows)
     html_body = _render_email_html(
         title="Nouvelle demande tourisme",
-        subtitle="Une reservation circuit vient d'etre enregistree depuis le site.",
+        subtitle="Une réservation de circuit vient d'être enregistrée depuis le site.",
         badge="Tourisme",
         rows=rows,
     )
@@ -186,24 +186,24 @@ def build_tourism_booking_email(db_demande) -> tuple[str, str, str]:
 
 
 def build_custom_tourism_email(db_demande) -> tuple[str, str, str]:
-    subject = f"Nouvelle demande tourisme personnalisee - {db_demande.nom_client} {db_demande.prenoms_client}"
+    subject = f"Nouvelle demande tourisme personnalisée - {db_demande.nom_client} {db_demande.prenoms_client}"
     rows = [
         ("Nom", db_demande.nom_client),
-        ("Prenoms", db_demande.prenoms_client),
-        ("Email", db_demande.email_client),
-        ("Telephone", db_demande.numero_telephone_client),
+        ("Prénoms", db_demande.prenoms_client),
+        ("E-mail", db_demande.email_client),
+        ("Téléphone", db_demande.numero_telephone_client),
         ("Nombre de personnes", db_demande.nombre_personne),
         ("Nombre de jours", db_demande.nombre_jours),
-        ("Lieu souhaite", db_demande.lieu_souhaite),
+        ("Lieu souhaité", db_demande.lieu_souhaite),
         ("Statut", db_demande.statut),
-        ("Attente voyage", db_demande.attente_voyage or "Aucune precision complementaire"),
+        ("Attente voyage", db_demande.attente_voyage or "Aucune précision complémentaire"),
     ]
-    body = "Nouvelle demande tourisme personnalisee\n\n" + "\n".join(
+    body = "Nouvelle demande tourisme personnalisée\n\n" + "\n".join(
         f"{label} : {_normalize_value(value)}" for label, value in rows
     )
     html_body = _render_email_html(
-        title="Nouvelle demande tourisme personnalisee",
-        subtitle="Un voyage sur mesure a ete demande depuis le site.",
+        title="Nouvelle demande tourisme personnalisée",
+        subtitle="Un voyage sur mesure a été demandé depuis le site.",
         badge="Sur mesure",
         rows=rows,
         accent="#0f766e",
@@ -212,34 +212,34 @@ def build_custom_tourism_email(db_demande) -> tuple[str, str, str]:
 
 
 def build_team_building_email(db_demande) -> tuple[str, str, str]:
-    cadres = ", ".join(c.cadre for c in getattr(db_demande, "cadres", []) if getattr(c, "cadre", None)) or "Non precise"
+    cadres = ", ".join(c.cadre for c in getattr(db_demande, "cadres", []) if getattr(c, "cadre", None)) or "Non précisé"
     rows = [
         ("Entreprise", db_demande.entreprise),
         ("Contact", db_demande.nom_contact),
         ("Fonction", db_demande.fonction_contact),
-        ("Telephone", db_demande.telephone_contact),
-        ("Email", db_demande.email_contact),
+        ("Téléphone", db_demande.telephone_contact),
+        ("E-mail", db_demande.email_contact),
         ("Participants", db_demande.nombre_participants),
         ("Objectif", db_demande.objectif),
-        ("Lieu souhaite", db_demande.lieu_souhaite),
-        ("Date souhaitee", db_demande.date_souhaitee),
-        ("Type d'activite", db_demande.type_activite),
+        ("Lieu souhaité", db_demande.lieu_souhaite),
+        ("Date souhaitée", db_demande.date_souhaitee),
+        ("Type d'activité", db_demande.type_activite),
         ("Cadres", cadres),
         ("Avec salle", "Oui" if db_demande.avec_salle else "Non"),
-        ("Avec nuitee", "Oui" if db_demande.avec_nuitee else "Non"),
-        ("Nombre de nuitees", db_demande.nombre_nuitees),
+        ("Avec nuitée", "Oui" if db_demande.avec_nuitee else "Non"),
+        ("Nombre de nuitées", db_demande.nombre_nuitees),
         ("Transport", "Inclus" if db_demande.transport_inclus else "Non"),
         ("Restauration", "Incluse" if db_demande.restauration_incluse else "Non"),
-        ("Hebergement", "Inclus" if db_demande.hebergement_inclus else "Non"),
-        ("Experience precedente", db_demande.experience_precedente),
-        ("Source de decouverte", db_demande.source_decouverte),
+        ("Hébergement", "Inclus" if db_demande.hebergement_inclus else "Non"),
+        ("Expérience précédente", db_demande.experience_precedente),
+        ("Source de découverte", db_demande.source_decouverte),
         ("Statut", db_demande.statut),
     ]
     subject = f"Nouvelle demande team building - {db_demande.entreprise}"
     body = "Nouvelle demande team building\n\n" + "\n".join(f"{label} : {_normalize_value(value)}" for label, value in rows)
     html_body = _render_email_html(
         title="Nouvelle demande team building",
-        subtitle="Une entreprise vient de soumettre un besoin d'activite ou de sejour d'equipe.",
+        subtitle="Une entreprise vient de soumettre un besoin d'activité ou de séjour d'équipe.",
         badge="Team Building",
         rows=rows,
         accent="#ea580c",
@@ -250,7 +250,7 @@ def build_team_building_email(db_demande) -> tuple[str, str, str]:
 def build_contact_email(db_demande) -> tuple[str, str, str]:
     rows = [
         ("Nom complet", db_demande.nom_complet),
-        ("Email", db_demande.email),
+        ("E-mail", db_demande.email),
         ("Sujet", db_demande.sujet),
         ("Type de demande", db_demande.type_demande),
         ("Statut", db_demande.statut),
@@ -260,7 +260,7 @@ def build_contact_email(db_demande) -> tuple[str, str, str]:
     body = "Nouvelle demande contact\n\n" + "\n".join(f"{label} : {_normalize_value(value)}" for label, value in rows)
     html_body = _render_email_html(
         title="Nouvelle demande contact",
-        subtitle="Un message a ete envoye depuis le formulaire de contact du site.",
+        subtitle="Un message a été envoyé depuis le formulaire de contact du site.",
         badge="Contact",
         rows=rows,
         accent="#2563eb",
@@ -270,7 +270,7 @@ def build_contact_email(db_demande) -> tuple[str, str, str]:
 
 def build_newsletter_subscription_email(db_subscription) -> tuple[str, str, str]:
     rows = [
-        ("Email", db_subscription.email),
+        ("E-mail", db_subscription.email),
         ("Langue", db_subscription.langue),
         ("Source", db_subscription.source),
         ("Consentement", "Oui" if db_subscription.consentement else "Non"),
@@ -282,7 +282,7 @@ def build_newsletter_subscription_email(db_subscription) -> tuple[str, str, str]
     )
     html_body = _render_email_html(
         title="Nouvelle inscription newsletter",
-        subtitle="Un visiteur vient de s'inscrire a la newsletter depuis le site.",
+        subtitle="Un visiteur vient de s'inscrire à la newsletter depuis le site.",
         badge="Newsletter",
         rows=rows,
         accent="#f27d26",
