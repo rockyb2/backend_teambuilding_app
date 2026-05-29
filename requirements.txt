@@ -15,3 +15,4 @@ reportlab
 openpyxl
 sib_api_v3_sdk
 litellm
+deepl

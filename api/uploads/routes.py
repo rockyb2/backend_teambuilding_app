@@ -1,11 +1,14 @@
 import os
+import random
 from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 import cloudinary
 import cloudinary.uploader
+from cloudinary import Search
+from cloudinary.utils import cloudinary_url
 
 from security import get_current_user, user_can_access_module
 
@@ -14,6 +17,11 @@ router = APIRouter(prefix="/api/uploads", tags=["uploads"])
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 CLOUDINARY_FOLDER = os.getenv("CLOUDINARY_UPLOAD_FOLDER", "ivoirtrips/circuits")
+PUBLIC_CLOUDINARY_FOLDERS = {
+    folder.strip().strip("/")
+    for folder in os.getenv("PUBLIC_CLOUDINARY_FOLDERS", "ivoirtrips/teambuilding/msf").split(",")
+    if folder.strip()
+}
 
 
 def require_upload_access(current_user=Depends(get_current_user)):
@@ -103,3 +111,56 @@ async def upload_image(file: UploadFile = File(...), current_user=Depends(requir
         "size": len(content),
         "content_type": content_type,
     }
+
+
+@router.get("/cloudinary/random")
+def get_random_cloudinary_images(
+    folder: str = Query("ivoirtrips/teambuilding/msf", min_length=1),
+    limit: int = Query(7, ge=1, le=20),
+):
+    normalized_folder = folder.strip().strip("/")
+    if normalized_folder not in PUBLIC_CLOUDINARY_FOLDERS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Dossier Cloudinary non autorise",
+        )
+
+    ensure_cloudinary_configured()
+
+    try:
+        result = Search().expression(f'asset_folder="{normalized_folder}"').max_results(500).execute()
+        resources = result.get("resources", [])
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Impossible de recuperer les images Cloudinary",
+        ) from exc
+
+    selected_images = random.sample(resources, min(limit, len(resources))) if resources else []
+    images = []
+    for item in selected_images:
+        public_id = item.get("public_id")
+        if not public_id:
+            continue
+
+        optimized_url, _ = cloudinary_url(
+            public_id,
+            secure=True,
+            fetch_format="auto",
+            quality="auto",
+            crop="fill",
+            width=1800,
+            height=1050,
+        )
+        images.append(
+            {
+                "public_id": public_id,
+                "url": optimized_url,
+                "secure_url": item.get("secure_url"),
+                "format": item.get("format"),
+                "width": item.get("width"),
+                "height": item.get("height"),
+            }
+        )
+
+    return {"folder": normalized_folder, "count": len(images), "images": images}

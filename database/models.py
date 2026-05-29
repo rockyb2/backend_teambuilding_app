@@ -14,6 +14,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     func,
     text,
 )
@@ -636,6 +637,11 @@ class CircuitTouristique(Base):
 
     created_by = relationship("Utilisateur", foreign_keys=[created_by_id])
     updated_by = relationship("Utilisateur", foreign_keys=[updated_by_id])
+    translations = relationship(
+        "CircuitTouristiqueTranslation",
+        back_populates="circuit",
+        cascade="all, delete-orphan",
+    )
 
     @property
     def title(self) -> str:
@@ -684,6 +690,39 @@ class CircuitTouristique(Base):
     @property
     def cancellation(self):
         return self.conditions_annulation
+
+
+class CircuitTouristiqueTranslation(Base):
+    __tablename__ = "circuits_touristiques_translations"
+    __table_args__ = (
+        UniqueConstraint("circuit_id", "langue", name="uq_circuit_langue"),
+        CheckConstraint("langue IN ('fr', 'en', 'es')", name="ck_circuit_translation_langue"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    circuit_id = Column(
+        Integer,
+        ForeignKey("circuits_touristiques.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    langue = Column(String(10), nullable=False, index=True)
+    titre = Column(String(255), nullable=False)
+    lieu = Column(String(255), nullable=True)
+    thematique = Column(String(255), nullable=True)
+    description = Column(Text, nullable=True)
+    details = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    duree = Column(String(120), nullable=True)
+    type_circuit = Column(String(100), nullable=True)
+    itineraire = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    formules = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    inclus = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    non_inclus = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    conditions_annulation = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    circuit = relationship("CircuitTouristique", back_populates="translations")
 
 # Modèles pour les demandes de tourisme fin
 
