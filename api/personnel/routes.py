@@ -41,13 +41,18 @@ def get_personnel(personnel_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=PersonnelRead, status_code=status.HTTP_201_CREATED)
-def create_personnel(payload: PersonnelCreate, db: Session = Depends(get_db)):
+def create_personnel(
+    payload: PersonnelCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_module_access("teambuilding")),
+):
     """Creer un nouveau membre du personnel"""
     if payload.email:
         existing = crud_personnel.get_personnel_by_email(db, payload.email)
         if existing:
             raise HTTPException(status_code=400, detail="Email deja utilise")
 
+    payload.id_utilisateur_create = getattr(current_user, "id_utilisateur", None)
     return crud_personnel.create_personnel(db, payload)
 
 

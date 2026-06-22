@@ -18,6 +18,9 @@ from database.schemas import (
     RefreshTokenResponse,
     RoleRead,
     UtilisateurCreate,
+    UtilisateurActivitySummary,
+    UtilisateurPasswordChange,
+    UtilisateurProfileUpdate,
     UtilisateurRead,
     UtilisateurUpdate,
 )
@@ -35,6 +38,21 @@ from security import (
 )
 
 router = APIRouter(prefix="/api/utilisateurs", tags=["utilisateurs"])
+
+
+def _auth_user_response(utilisateur):
+    return {
+        "id_utilisateur": utilisateur.id_utilisateur,
+        "nom": utilisateur.nom,
+        "prenom": utilisateur.prenom,
+        "email": utilisateur.email,
+        "role": get_user_role_name(utilisateur),
+        "id_role": utilisateur.id_role,
+        "actif": utilisateur.actif,
+        "date_creation": utilisateur.date_creation,
+        "derniere_connexion": utilisateur.derniere_connexion,
+        "image_utilisateur": utilisateur.image_utilisateur,
+    }
 
 
 @router.get("/roles", response_model=List[RoleRead])
@@ -92,6 +110,19 @@ def get_utilisateurs_by_role(
         for utilisateur in utilisateurs
         if utilisateur.id_utilisateur != current_user_id
     ]
+
+
+@router.get("/{utilisateur_id}/activity-summary", response_model=UtilisateurActivitySummary)
+def get_utilisateur_activity_summary(
+    utilisateur_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_user_management_access),
+):
+    db_utilisateur = crud_utilisateur.get_utilisateur(db, utilisateur_id)
+    if not db_utilisateur:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouve")
+
+    return crud_utilisateur.get_utilisateur_activity_summary(db, db_utilisateur)
 
 
 @router.get("/{utilisateur_id}", response_model=UtilisateurRead)
@@ -171,12 +202,12 @@ def delete_utilisateur(
     db: Session = Depends(get_db),
     current_user=Depends(require_user_management_access),
 ):
-    if not is_super_admin(current_user):
-        raise HTTPException(status_code=403, detail="Seul un super_admin peut supprimer un utilisateur")
-
     db_utilisateur = crud_utilisateur.get_utilisateur(db, utilisateur_id)
     if not db_utilisateur:
         raise HTTPException(status_code=404, detail="Utilisateur non trouve")
+
+    if db_utilisateur.id_utilisateur == getattr(current_user, "id_utilisateur", None):
+        raise HTTPException(status_code=403, detail="Vous ne pouvez pas supprimer votre propre compte")
 
     if normalize_role_name(db_utilisateur.role) == "super_admin":
         raise HTTPException(status_code=403, detail="Vous ne pouvez pas supprimer un super_admin")
@@ -189,6 +220,8 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     utilisateur = crud_utilisateur.authenticate_utilisateur(db, payload.email, payload.password)
     if not utilisateur:
         raise HTTPException(status_code=401, detail="Identifiants invalides")
+
+    utilisateur = crud_utilisateur.record_login(db, utilisateur)
 
     user_payload = {
         "sub": str(utilisateur.id_utilisateur),
@@ -203,17 +236,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         "access_token": access_token,
         "refresh_token": refresh_token,
         "token_type": "bearer",
-        "user": {
-            "id_utilisateur": utilisateur.id_utilisateur,
-            "nom": utilisateur.nom,
-            "prenom": utilisateur.prenom,
-            "email": utilisateur.email,
-            "role": get_user_role_name(utilisateur),
-            "id_role": utilisateur.id_role,
-            "actif": utilisateur.actif,
-            "date_creation": utilisateur.date_creation,
-            "image_utilisateur": utilisateur.image_utilisateur,
-        },
+        "user": _auth_user_response(utilisateur),
     }
 
 
@@ -235,14 +258,72 @@ def refresh_access_token(payload: RefreshTokenRequest):
 
 @router.get("/auth/me", response_model=AuthUserResponse)
 def get_me(current_user=Depends(get_current_user)):
-    return {
-        "id_utilisateur": current_user.id_utilisateur,
-        "nom": current_user.nom,
-        "prenom": current_user.prenom,
-        "email": current_user.email,
-        "role": get_user_role_name(current_user),
-        "id_role": current_user.id_role,
-        "actif": current_user.actif,
-        "date_creation": current_user.date_creation,
-        "image_utilisateur": current_user.image_utilisateur,
-    }
+    return _auth_user_response(current_user)
+
+
+@router.patch("/auth/me", response_model=AuthUserResponse)
+def update_me(
+    payload: UtilisateurProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    db_utilisateur = crud_utilisateur.get_utilisateur(db, current_user.id_utilisateur)
+    if not db_utilisateur:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouve")
+
+    updates = payload.model_dump(exclude_unset=True) if hasattr(payload, "model_dump") else payload.dict(exclude_unset=True)
+
+    if "nom" in updates:
+        updates["nom"] = (updates["nom"] or "").strip()
+        if not updates["nom"]:
+            raise HTTPException(status_code=400, detail="Le nom est obligatoire")
+
+    if "prenom" in updates and updates["prenom"] is not None:
+        updates["prenom"] = updates["prenom"].strip() or None
+
+    if "email" in updates:
+        updates["email"] = (updates["email"] or "").strip().lower()
+        if not updates["email"]:
+            raise HTTPException(status_code=400, detail="L email est obligatoire")
+        email_local, separator, email_domain = updates["email"].partition("@")
+        if not email_local or not separator or "." not in email_domain:
+            raise HTTPException(status_code=400, detail="L email est invalide")
+
+        existing = crud_utilisateur.get_utilisateur_by_email(db, updates["email"])
+        if existing and existing.id_utilisateur != db_utilisateur.id_utilisateur:
+            raise HTTPException(status_code=400, detail="Email deja utilise")
+
+    if "image_utilisateur" in updates and updates["image_utilisateur"] is not None:
+        updates["image_utilisateur"] = updates["image_utilisateur"].strip() or None
+
+    normalized_payload = UtilisateurProfileUpdate(**updates)
+    utilisateur = crud_utilisateur.update_utilisateur_profile(db, db_utilisateur, normalized_payload)
+    return _auth_user_response(utilisateur)
+
+
+@router.post("/auth/me/password")
+def change_my_password(
+    payload: UtilisateurPasswordChange,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    db_utilisateur = crud_utilisateur.get_utilisateur(db, current_user.id_utilisateur)
+    if not db_utilisateur:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouve")
+
+    if payload.current_password == payload.new_password:
+        raise HTTPException(
+            status_code=400,
+            detail="Le nouveau mot de passe doit etre different de l ancien",
+        )
+
+    changed = crud_utilisateur.change_utilisateur_password(
+        db,
+        db_utilisateur,
+        payload.current_password,
+        payload.new_password,
+    )
+    if not changed:
+        raise HTTPException(status_code=400, detail="Mot de passe actuel incorrect")
+
+    return {"message": "Mot de passe modifie avec succes"}

@@ -42,6 +42,7 @@ class ORMBaseModel(BaseModel):
 
 DemandeTourismeStatut = Literal[
     "nouvelle",
+    "contactee",
     "en_traitement",
     "devis_envoye",
     "en_attente_reponse_client",
@@ -54,6 +55,7 @@ DemandeTourismeStatut = Literal[
 
 STATUTS_DEMANDE_TOURISME: tuple[str, ...] = (
     "nouvelle",
+    "contactee",
     "en_traitement",
     "devis_envoye",
     "en_attente_reponse_client",
@@ -72,6 +74,9 @@ class ClientBase(ORMBaseModel):
     email: Optional[str] = None
     telephone: Optional[str] = None
     adresse: Optional[str] = None
+    role: Optional[str] = None
+    secteur_activite: Optional[str] = None
+    statut: Optional[str] = None
     date_creation: Optional[datetime] = None
     id_utilisateur_create: Optional[int] = None
 
@@ -87,6 +92,9 @@ class ClientUpdate(ORMBaseModel):
     email: Optional[str] = None
     telephone: Optional[str] = None
     adresse: Optional[str] = None
+    role: Optional[str] = None
+    secteur_activite: Optional[str] = None
+    statut: Optional[str] = None
     date_creation: Optional[datetime] = None
     id_utilisateur_create: Optional[int] = None
 
@@ -115,36 +123,173 @@ class DemandeRead(DemandeBase):
     id_demande: int
 
 
+OffreStatut = Literal["brouillon", "envoyee", "validee", "refusee", "expiree", "annulee"]
+DemandeTeamBuildingStatut = Literal["nouvelle", "contactee", "devis_envoye", "confirmee", "annulee"]
+
+
 class OffreBase(ORMBaseModel):
-    date_creation: Optional[date] = None
-    montant_propose: Decimal
-    statut_offre: Optional[str] = "brouillon"
-    id_demande: int
-    id_utilisateur_create: Optional[int] = None
+    demande_id: int
+    titre: str
+    montant_total: Decimal
+    version: int = 1
+    statut: OffreStatut = "brouillon"
+    date_envoi: Optional[date] = None
+    date_validation: Optional[date] = None
+    date_expiration: Optional[date] = None
+    fichier_pptx: Optional[str] = None
+    conditions_paiement: Optional[str] = None
+    observations: Optional[str] = None
+    id_utilisateur_cr: Optional[int] = None
 
 
 class OffreCreate(OffreBase):
     pass
 
 
+class OffreUpdate(ORMBaseModel):
+    demande_id: Optional[int] = None
+    titre: Optional[str] = None
+    montant_total: Optional[Decimal] = None
+    version: Optional[int] = None
+    statut: Optional[OffreStatut] = None
+    date_envoi: Optional[date] = None
+    date_validation: Optional[date] = None
+    date_expiration: Optional[date] = None
+    fichier_pptx: Optional[str] = None
+    conditions_paiement: Optional[str] = None
+    observations: Optional[str] = None
+    id_utilisateur_cr: Optional[int] = None
+
+
 class OffreRead(OffreBase):
-    id_offre: int
+    id: int
+    reference: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
 
 
-class SiteImageBase(ORMBaseModel):
-    image_url: str
-    alt: Optional[str] = None
-    ordre: Optional[int] = 0
+ProformaStatut = Literal["brouillon", "validee", "pdf_genere", "annulee"]
+ProformaPole = Literal["teambuilding", "tourisme"]
 
 
-class SiteImageCreate(SiteImageBase):
+class ProformaBase(ORMBaseModel):
+    pole: ProformaPole = "teambuilding"
+    demande_team_building_id: Optional[int] = None
+    offre_id: Optional[int] = None
+    demande_tourisme_id: Optional[int] = None
+    demande_tourisme_custom_id: Optional[int] = None
+    offre_tourisme_id: Optional[int] = None
+    site_id: Optional[int] = None
+    client: str
+    nombre_personnes: int
+    objet: str
+    date_proforma: date
+    date_evenement: Optional[date] = None
+    sections: list[dict[str, Any]] = Field(default_factory=list)
+    frais_agence: Decimal = Decimal("0")
+    details_frais_agence: list[str] = Field(default_factory=list)
+    taux_tva_frais_agence: Decimal = Decimal("18")
+    modalite_paiement: Optional[str] = None
+    recommandations: list[dict[str, Any]] = Field(default_factory=list)
+    notes: Optional[str] = None
+    statut: ProformaStatut = "validee"
+
+
+class ProformaCreate(ProformaBase):
     pass
 
 
-class SiteImageRead(SiteImageBase):
+class ProformaUpdate(ORMBaseModel):
+    pole: Optional[ProformaPole] = None
+    demande_team_building_id: Optional[int] = None
+    offre_id: Optional[int] = None
+    demande_tourisme_id: Optional[int] = None
+    demande_tourisme_custom_id: Optional[int] = None
+    offre_tourisme_id: Optional[int] = None
+    site_id: Optional[int] = None
+    client: Optional[str] = None
+    nombre_personnes: Optional[int] = None
+    objet: Optional[str] = None
+    date_proforma: Optional[date] = None
+    date_evenement: Optional[date] = None
+    sections: Optional[list[dict[str, Any]]] = None
+    frais_agence: Optional[Decimal] = None
+    details_frais_agence: Optional[list[str]] = None
+    taux_tva_frais_agence: Optional[Decimal] = None
+    modalite_paiement: Optional[str] = None
+    recommandations: Optional[list[dict[str, Any]]] = None
+    notes: Optional[str] = None
+    statut: Optional[ProformaStatut] = None
+
+
+class ProformaRead(ProformaBase):
     id: int
-    site_id: int
+    reference: str
+    sous_total_ht: Decimal
+    tva_frais_agence: Decimal
+    total_ttc: Decimal
+    fichier_pdf: Optional[str] = None
+    created_by_id: Optional[int] = None
     created_at: datetime
+    updated_at: datetime
+
+
+class ProformaAssistantSessionCreate(ORMBaseModel):
+    demande_id: Optional[int] = None
+    offre_id: Optional[int] = None
+
+
+class ProformaAssistantMessageCreate(ORMBaseModel):
+    message: str
+
+
+class ProformaAssistantResponse(ORMBaseModel):
+    session_id: str
+    response: str
+    collected_fields: dict[str, Any] = Field(default_factory=dict)
+    missing_fields: list[str] = Field(default_factory=list)
+    recommendations: list[dict[str, Any]] = Field(default_factory=list)
+    draft: Optional[dict[str, Any]] = None
+
+
+class OffreTourismeBase(ORMBaseModel):
+    demande_tourisme_id: Optional[int] = None
+    demande_tourisme_custom_id: Optional[int] = None
+    titre: str
+    montant_total: Decimal
+    version: int = 1
+    statut: OffreStatut = "brouillon"
+    date_envoi: Optional[date] = None
+    date_validation: Optional[date] = None
+    date_expiration: Optional[date] = None
+    conditions_paiement: Optional[str] = None
+    observations: Optional[str] = None
+
+
+class OffreTourismeCreate(OffreTourismeBase):
+    pass
+
+
+class OffreTourismeUpdate(ORMBaseModel):
+    demande_tourisme_id: Optional[int] = None
+    demande_tourisme_custom_id: Optional[int] = None
+    titre: Optional[str] = None
+    montant_total: Optional[Decimal] = None
+    version: Optional[int] = None
+    statut: Optional[OffreStatut] = None
+    date_envoi: Optional[date] = None
+    date_validation: Optional[date] = None
+    date_expiration: Optional[date] = None
+    conditions_paiement: Optional[str] = None
+    observations: Optional[str] = None
+
+
+class OffreTourismeRead(OffreTourismeBase):
+    id: int
+    reference: str
+    created_by_id: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
 
 
 class SiteBase(ORMBaseModel):
@@ -152,10 +297,15 @@ class SiteBase(ORMBaseModel):
     localisation: Optional[str] = None
     capacite: Optional[int] = None
     type_site: Optional[str] = None
-    image_site: Optional[str] = None
     date_creation: Optional[datetime] = None
+    contact_site: Optional[str] = None
+    email_site: Optional[str] = None
     id_utilisateur_create: Optional[int] = None
-    images: list[SiteImageCreate] = Field(default_factory=list)
+    images: list[Any] = Field(default_factory=list)
+    a_restauration: bool = False
+    tarifs_restauration: Optional[dict[str, Any]] = None
+    a_salle_seminaire: bool = False
+    tarifs_seminaire: Optional[dict[str, Any]] = None
 
 
 class SiteCreate(SiteBase):
@@ -164,18 +314,26 @@ class SiteCreate(SiteBase):
 
 class SiteRead(SiteBase):
     id_site: int
-    images: list[SiteImageRead] = Field(default_factory=list)
+    images: list[Any] = Field(default_factory=list)
+
+
+ActiviteStatut = Literal["brouillon", "planifier", "en_preparation", "en_cours", "terminer", "annuler"]
 
 
 class ActiviteBase(ORMBaseModel):
-    nom: str
+    titre: str
     description: Optional[str] = None
+    client_id: Optional[int] = None
+    demande_id: Optional[int] = None
+    offre_id: Optional[int] = None
     date_debut: datetime
     date_fin: datetime
-    statut: Optional[str] = "planifiee"
-    id_offre: Optional[int] = None
-    id_site: int
-    date_creation: Optional[datetime] = None
+    nombre_participants: Optional[int] = None
+    site_id: int
+    responsable_id: Optional[int] = None
+    budget_previsionnel: Optional[Decimal] = None
+    statut: ActiviteStatut = "planifier"
+    observations: Optional[str] = None
     id_utilisateur_create: Optional[int] = None
 
 
@@ -183,8 +341,39 @@ class ActiviteCreate(ActiviteBase):
     pass
 
 
+class ActiviteUpdate(ORMBaseModel):
+    titre: Optional[str] = None
+    description: Optional[str] = None
+    client_id: Optional[int] = None
+    demande_id: Optional[int] = None
+    offre_id: Optional[int] = None
+    date_debut: Optional[datetime] = None
+    date_fin: Optional[datetime] = None
+    nombre_participants: Optional[int] = None
+    site_id: Optional[int] = None
+    responsable_id: Optional[int] = None
+    budget_previsionnel: Optional[Decimal] = None
+    statut: Optional[ActiviteStatut] = None
+    observations: Optional[str] = None
+    id_utilisateur_create: Optional[int] = None
+
+
 class ActiviteRead(ActiviteBase):
-    id_activite: int
+    id: int
+    reference: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class JeuMaterielInput(ORMBaseModel):
+    materiel_id: int
+    quantite_requise: int = Field(default=1, gt=0)
+
+
+class JeuMaterielRead(JeuMaterielInput):
+    id: int
+    jeu_id: int
+    created_at: datetime
 
 
 class JeuBase(ORMBaseModel):
@@ -196,12 +385,25 @@ class JeuBase(ORMBaseModel):
     nb_participant_max: Optional[int] = None
     materiel_requis: Optional[str] = None
     image_jeux: Optional[str] = None
+    materiels: list[JeuMaterielRead] = Field(default_factory=list)
     date_creation: Optional[datetime] = None
     id_utilisateur_create: Optional[int] = None
 
 
 class JeuCreate(JeuBase):
-    pass
+    materiels: list[JeuMaterielInput] = Field(default_factory=list)
+
+
+class JeuUpdate(ORMBaseModel):
+    nom_jeu: Optional[str] = None
+    description: Optional[str] = None
+    duree: Optional[int] = None
+    nb_min_participants: Optional[int] = None
+    nb_max_participants: Optional[int] = None
+    nb_participant_max: Optional[int] = None
+    materiel_requis: Optional[str] = None
+    image_jeux: Optional[str] = None
+    materiels: Optional[list[JeuMaterielInput]] = None
 
 
 class JeuRead(JeuBase):
@@ -209,8 +411,8 @@ class JeuRead(JeuBase):
 
 
 class ActiviteJeuBase(ORMBaseModel):
-    id_activite: int
-    id_jeu: int
+    activite_id: int
+    jeu_id: int
     ordre: Optional[int] = None
     duree_prevue: Optional[int] = None
     date_creation: Optional[datetime] = None
@@ -288,8 +490,8 @@ class BenevoleRead(BenevoleBase):
 
 
 class AffectationBase(ORMBaseModel):
-    id_activite: int
-    id_personnel: int
+    activite_id: int
+    personnel_id: int
     role: Optional[str] = None
     heure_debut: Optional[datetime] = None
     heure_fin: Optional[datetime] = None
@@ -305,22 +507,169 @@ class AffectationRead(AffectationBase):
     id_affectation: int
 
 
-class DepenseBase(ORMBaseModel):
-    libelle: str
-    montant: Decimal
-    date_depense: Optional[date] = None
-    type_depense: Optional[str] = None
-    id_activite: int
-    date_creation: Optional[datetime] = None
+class ActiviteBenevoleBase(ORMBaseModel):
+    activite_id: int
+    benevole_id: int
+    role: Optional[str] = None
+
+
+class ActiviteBenevoleCreate(ActiviteBenevoleBase):
+    pass
+
+
+class ActiviteBenevoleUpdate(ORMBaseModel):
+    role: Optional[str] = None
+
+
+class ActiviteBenevoleRead(ActiviteBenevoleBase):
+    id: int
+    created_at: datetime
+
+
+class MaterielBase(ORMBaseModel):
+    nom: str
+    marque: Optional[str] = None
+    modele: Optional[str] = None
+    description: Optional[str] = None
+    quantite_disponible: int = Field(default=0, ge=0)
+    statut: Optional[bool] = True
     id_utilisateur_create: Optional[int] = None
+
+
+class MaterielCreate(MaterielBase):
+    pass
+
+
+class MaterielUpdate(ORMBaseModel):
+    nom: Optional[str] = None
+    marque: Optional[str] = None
+    modele: Optional[str] = None
+    description: Optional[str] = None
+    quantite_disponible: Optional[int] = Field(default=None, ge=0)
+    statut: Optional[bool] = None
+    id_utilisateur_create: Optional[int] = None
+
+
+class MaterielRead(MaterielBase):
+    id: int
+    date_ajout: datetime
+
+
+class MaterielProductionBase(ORMBaseModel):
+    marque: str = Field(min_length=1, max_length=100)
+    modele: str = Field(min_length=1, max_length=150)
+    quantite: int = Field(default=0, ge=0)
+
+
+class MaterielProductionCreate(MaterielProductionBase):
+    pass
+
+
+class MaterielProductionUpdate(ORMBaseModel):
+    marque: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    modele: Optional[str] = Field(default=None, min_length=1, max_length=150)
+    quantite: Optional[int] = Field(default=None, ge=0)
+
+
+class MaterielProductionRead(MaterielProductionBase):
+    id: int
+    date_ajout: datetime
+
+
+class ActiviteMaterielBase(ORMBaseModel):
+    activite_id: int
+    materiel_id: int
+    quantite_prevue: int = Field(default=1, gt=0)
+    quantite_utilisee: Optional[int] = Field(default=None, ge=0)
+
+
+class ActiviteMaterielCreate(ActiviteMaterielBase):
+    pass
+
+
+class ActiviteMaterielUpdate(ORMBaseModel):
+    quantite_prevue: Optional[int] = Field(default=None, gt=0)
+    quantite_utilisee: Optional[int] = Field(default=None, ge=0)
+
+
+class ActiviteMaterielRead(ActiviteMaterielBase):
+    id: int
+    created_at: datetime
+
+
+class MaterielDisponibiliteRead(ORMBaseModel):
+    materiel_id: int
+    quantite_totale: int
+    quantite_reservee: int
+    quantite_disponible: int
+
+
+ModePaiementDepense = Literal[
+    "ESPECES",
+    "WAVE",
+    "ORANGE_MONEY",
+    "MTN_MONEY",
+    "VIREMENT",
+    "CHEQUE",
+    "CARTE_BANCAIRE",
+]
+
+
+class CategorieDepenseBase(ORMBaseModel):
+    nom: str
+
+
+class CategorieDepenseCreate(CategorieDepenseBase):
+    pass
+
+
+class CategorieDepenseUpdate(ORMBaseModel):
+    nom: Optional[str] = None
+
+
+class CategorieDepenseRead(CategorieDepenseBase):
+    id: int
+
+
+class DepenseBase(ORMBaseModel):
+    titre: str
+    montant: Decimal
+    description: Optional[str] = None
+    date_depense: Optional[date] = None
+    categorie_depense_id: Optional[int] = None
+    offre_id: Optional[int] = None
+    activite_id: int
+    fournisseur: Optional[str] = None
+    mode_paiement: Optional[ModePaiementDepense] = None
+    type_depense: Optional[str] = None
+    justificatif: Optional[str] = None
+    id_utilisateur_cr: Optional[int] = None
 
 
 class DepenseCreate(DepenseBase):
     pass
 
 
+class DepenseUpdate(ORMBaseModel):
+    titre: Optional[str] = None
+    montant: Optional[Decimal] = None
+    description: Optional[str] = None
+    date_depense: Optional[date] = None
+    categorie_depense_id: Optional[int] = None
+    offre_id: Optional[int] = None
+    activite_id: Optional[int] = None
+    fournisseur: Optional[str] = None
+    mode_paiement: Optional[ModePaiementDepense] = None
+    type_depense: Optional[str] = None
+    justificatif: Optional[str] = None
+    id_utilisateur_cr: Optional[int] = None
+
+
 class DepenseRead(DepenseBase):
-    id_depense: int
+    id: int
+    reference: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
 
 
 class DemandeTourismeBase(ORMBaseModel):
@@ -350,6 +699,8 @@ class DemandeTourismeRead(DemandeTourismeBase):
     id: int
     statut_modifie_le: Optional[datetime] = None
     statut_modifie_par_id: Optional[int] = None
+    created_by_id: Optional[int] = None
+    created_by_nom_complet: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -469,15 +820,23 @@ class DemandeTeamBuildingBase(ORMBaseModel):
     experience_precedente: Optional[str] = None
     source_decouverte: Optional[str] = None
     source: Optional[str] = "site_web"
-    statut: Optional[str] = "nouvelle"
+    statut: Optional[DemandeTeamBuildingStatut] = "nouvelle"
 
 
 class DemandeTeamBuildingCreate(DemandeTeamBuildingBase):
     cadres: list[DemandeTeamBuildingCadreCreate] = []
 
 
+class DemandeTeamBuildingStatutUpdate(ORMBaseModel):
+    statut: DemandeTeamBuildingStatut
+
+
 class DemandeTeamBuildingRead(DemandeTeamBuildingBase):
     id: int
+    statut_modifie_le: Optional[datetime] = None
+    statut_modifie_par_id: Optional[int] = None
+    created_by_id: Optional[int] = None
+    created_by_nom_complet: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     cadres: list[DemandeTeamBuildingCadreRead] = []
@@ -570,6 +929,38 @@ class RoleUpdate(ORMBaseModel):
 class UtilisateurRead(UtilisateurBase):
     id_utilisateur: int
     date_creation: datetime
+    derniere_connexion: Optional[datetime] = None
+
+
+class UtilisateurActivityCreation(ORMBaseModel):
+    key: str
+    label: str
+    count: int
+
+
+class UtilisateurActivityMetric(ORMBaseModel):
+    module: str
+    label: str
+    total_demandes: int
+    demandes_traitees: int
+    demandes_creees: int = 0
+    offres_creees: int = 0
+    elements_crees: int
+    creations: list[UtilisateurActivityCreation] = Field(default_factory=list)
+
+
+class UtilisateurActivitySummary(ORMBaseModel):
+    id_utilisateur: int
+    role: Optional[str] = None
+    modules: list[str] = Field(default_factory=list)
+    derniere_connexion: Optional[datetime] = None
+    total_demandes: int = 0
+    demandes_traitees: int = 0
+    demandes_creees: int = 0
+    offres_creees: int = 0
+    taux_traitement: float = 0
+    elements_crees: int = 0
+    metrics: list[UtilisateurActivityMetric] = Field(default_factory=list)
 
 
 class UtilisateurUpdate(ORMBaseModel):
@@ -581,6 +972,32 @@ class UtilisateurUpdate(ORMBaseModel):
     actif: Optional[bool] = None
     id_utilisateur_create: Optional[int] = None
     image_utilisateur: Optional[str] = None
+
+
+class UtilisateurProfileUpdate(ORMBaseModel):
+    nom: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    prenom: Optional[str] = Field(default=None, max_length=100)
+    email: Optional[str] = Field(default=None, min_length=3, max_length=150)
+    image_utilisateur: Optional[str] = Field(default=None, max_length=500)
+
+    if ConfigDict is not None:
+        model_config = ConfigDict(from_attributes=True, extra="forbid")
+    else:  # pragma: no cover
+        class Config:
+            orm_mode = True
+            extra = "forbid"
+
+
+class UtilisateurPasswordChange(ORMBaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+    if ConfigDict is not None:
+        model_config = ConfigDict(from_attributes=True, extra="forbid")
+    else:  # pragma: no cover
+        class Config:
+            orm_mode = True
+            extra = "forbid"
 
 
 class LoginRequest(ORMBaseModel):
@@ -601,6 +1018,7 @@ class AuthUserResponse(ORMBaseModel):
     id_role: Optional[int] = None
     actif: Optional[bool] = True
     date_creation: Optional[datetime] = None
+    derniere_connexion: Optional[datetime] = None
     image_utilisateur: Optional[str] = None
 
 
@@ -625,6 +1043,7 @@ class DemandeTourismeCustumerBase(ORMBaseModel):
     nb_jours: Optional[int] = None
     lieu_souhaite: Optional[str] = None
     attente_voyage: Optional[str] = None
+    source: Optional[str] = "site_web"
     statut: Optional[DemandeTourismeStatut] = "nouvelle"
 
 
@@ -632,6 +1051,10 @@ class DemandeTourismeCustom(DemandeTourismeCustumerBase):
     id: int
     statut_modifie_le: Optional[datetime] = None
     statut_modifie_par_id: Optional[int] = None
+    created_by_id: Optional[int] = None
+    updated_by_id: Optional[int] = None
+    created_by_nom_complet: Optional[str] = None
+    updated_by_nom_complet: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

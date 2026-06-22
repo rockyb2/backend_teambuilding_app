@@ -74,8 +74,16 @@ def get_demandes_tourisme_custom(
     )
 
 
-def create_demande_tourisme(db: Session, payload: DemandeTourismeCreate) -> DemandeTourisme:
-    db_demande = DemandeTourisme(**_model_dump(payload))
+def create_demande_tourisme(
+    db: Session,
+    payload: DemandeTourismeCreate,
+    source: str = "site_web",
+    created_by_id: int | None = None,
+) -> DemandeTourisme:
+    data = _model_dump(payload)
+    data["source"] = source
+    data["created_by_id"] = created_by_id
+    db_demande = DemandeTourisme(**data)
     db.add(db_demande)
     db.commit()
     db.refresh(db_demande)
@@ -99,9 +107,17 @@ def update_demande_tourisme(
 
 
 def create_demande_tourisme_custom(
-    db: Session, payload: DemandeTourismeCustumerCreate | dict
+    db: Session,
+    payload: DemandeTourismeCustumerCreate | dict,
+    source: str = "site_web",
+    created_by_id: int | None = None,
 ) -> DemandeTourismeCustom:
-    db_demande = DemandeTourismeCustom(**_normalize_custom_tourism_payload(payload))
+    db_demande = DemandeTourismeCustom(
+        **_normalize_custom_tourism_payload(payload),
+        source=source,
+        created_by_id=created_by_id,
+        updated_by_id=created_by_id,
+    )
     db.add(db_demande)
     db.commit()
     db.refresh(db_demande)
@@ -112,12 +128,14 @@ def update_demande_tourisme_custom(
     db: Session,
     db_demande: DemandeTourismeCustom,
     payload: DemandeTourismeCustumerCreate | dict,
+    updated_by_id: int | None = None,
 ) -> DemandeTourismeCustom:
     data = _normalize_custom_tourism_payload(payload)
 
     for key, value in data.items():
         if hasattr(db_demande, key):
             setattr(db_demande, key, value)
+    db_demande.updated_by_id = updated_by_id
 
     db.commit()
     db.refresh(db_demande)
@@ -178,6 +196,8 @@ def update_demande_tourisme_custom_statut(
     db_demande.statut = nouveau_statut
     db_demande.statut_modifie_le = modifie_le
     db_demande.statut_modifie_par_id = utilisateur_id
+    db_demande.updated_by_id = utilisateur_id
+    db_demande.updated_at = modifie_le
     db.add(
         HistoriqueStatutDemandeTourisme(
             demande_tourisme_custom_id=db_demande.id,

@@ -29,7 +29,12 @@ def get_allowed_origins() -> list[str]:
 
 
 allowed_origins = get_allowed_origins()
-local_dev_origin_regex = r"https?://(localhost|127\.0\.0\.1)(:\d+)?"
+allowed_origin_regex = (
+    r"https?://(localhost|127\.0\.0\.1)(:\d+)?"
+    r"|http://(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?"
+    r"|https://([a-z0-9-]+\.)?onrender\.com"
+    r"|https://(www\.)?ivoirtrips\.com"
+)
 
 app = FastAPI(
     title="Team Building Management API",
@@ -41,7 +46,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_origin_regex=local_dev_origin_regex,
+    allow_origin_regex=allowed_origin_regex,
     allow_credentials="*" not in allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],

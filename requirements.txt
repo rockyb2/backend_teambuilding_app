@@ -12,6 +12,7 @@ smolagents
 mistralai
 python-docx
 reportlab
+num2words
 openpyxl
 sib_api_v3_sdk
 litellm

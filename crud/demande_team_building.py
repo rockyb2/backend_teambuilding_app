@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session, selectinload
@@ -35,10 +36,15 @@ def get_demandes_team_building(
 
 
 def create_demande_team_building(
-    db: Session, payload: DemandeTeamBuildingCreate
+    db: Session,
+    payload: DemandeTeamBuildingCreate,
+    source: str = "site_web",
+    created_by_id: int | None = None,
 ) -> DemandeTeamBuilding:
     data = _model_dump(payload)
     cadres = data.pop("cadres", [])
+    data["source"] = source
+    data["created_by_id"] = created_by_id
 
     db_demande = DemandeTeamBuilding(**data)
     for cadre in cadres:
@@ -78,8 +84,11 @@ def update_demande_team_building_statut(
     db: Session,
     db_demande: DemandeTeamBuilding,
     statut: str,
+    utilisateur_id: int | None = None,
 ) -> DemandeTeamBuilding:
     db_demande.statut = statut
+    db_demande.statut_modifie_le = datetime.now(timezone.utc)
+    db_demande.statut_modifie_par_id = utilisateur_id
     db.commit()
     db.refresh(db_demande)
     return get_demande_team_building(db, db_demande.id) or db_demande

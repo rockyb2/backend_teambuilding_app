@@ -19,6 +19,15 @@ def get_client(db: Session, client_id: int) -> Optional[Client]:
 def get_client_by_email(db: Session, email: str) -> Optional[Client]:
     return db.query(Client).filter(Client.email == email).first()
 
+def get_client_by_role(db: Session, role: str) -> Optional[Client]:
+    return db.query(Client).filter(Client.role == role).first()
+
+def get_client_by_secteur_activite(db: Session, secteur_activite: str) -> Optional[Client]:
+    return db.query(Client).filter(Client.secteur_activite == secteur_activite).first()
+
+def get_client_by_statut(db: Session, statut: str) -> Optional[Client]:
+    return db.query(Client).filter(Client.statut == statut).first()
+
 
 def get_clients(db: Session, skip: int = 0, limit: int = 100) -> list[Client]:
     return db.query(Client).offset(skip).limit(limit).all()

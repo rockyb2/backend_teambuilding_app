@@ -36,7 +36,11 @@ def get_client(client_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=ClientRead, status_code=status.HTTP_201_CREATED)
-def create_client(payload: ClientCreate, db: Session = Depends(get_db)):
+def create_client(
+    payload: ClientCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_module_access("teambuilding")),
+):
     """Créer un nouveau client"""
     # Vérifier l'unicité de l'email
     if payload.email:
@@ -44,6 +48,7 @@ def create_client(payload: ClientCreate, db: Session = Depends(get_db)):
         if existing:
             raise HTTPException(status_code=400, detail="Email déjà utilisé")
     
+    payload.id_utilisateur_create = getattr(current_user, "id_utilisateur", None)
     return crud_client.create_client(db, payload)
 
 

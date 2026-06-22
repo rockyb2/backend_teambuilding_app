@@ -104,6 +104,10 @@ def can_manage_roles(user) -> bool:
     return is_super_admin(user)
 
 
+def can_view_financials(user) -> bool:
+    return get_user_role_name(user) in {ROLE_SUPER_ADMIN, ROLE_ADMIN}
+
+
 def can_assign_role(user, target_role_name: Optional[str]) -> bool:
     normalized_target = normalize_role_name(target_role_name)
     current_role = get_user_role_name(user)
@@ -235,5 +239,14 @@ def require_role_management_access(current_user=Depends(get_current_user)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Vous n avez pas les droits pour gerer les roles",
+        )
+    return current_user
+
+
+def require_financial_access(current_user=Depends(get_current_user)):
+    if not can_view_financials(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous n avez pas les droits pour consulter les donnees financieres",
         )
     return current_user

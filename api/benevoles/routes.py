@@ -35,7 +35,11 @@ def get_benevole(benevole_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=BenevoleRead, status_code=status.HTTP_201_CREATED)
-def create_benevole(payload: BenevoleCreate, db: Session = Depends(get_db)):
+def create_benevole(
+    payload: BenevoleCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_module_access("teambuilding")),
+):
     if not payload.email.strip():
         raise HTTPException(status_code=400, detail="Email obligatoire")
 
@@ -43,6 +47,7 @@ def create_benevole(payload: BenevoleCreate, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=400, detail="Email deja utilise")
 
+    payload.id_utilisateur_create = getattr(current_user, "id_utilisateur", None)
     return crud_benevole.create_benevole(db, payload)
 
 

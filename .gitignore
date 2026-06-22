@@ -1,6 +1,40 @@
+# Environnement
 .env
-.env.example
-__pycache__
-.vscode
-teambuidingenv/
+.env.*
+!.env.example
+
+# Environnements Python
+venv/
+.venv/
+env/
 backendenv/
+teambuidingenv/
+
+# Python cache
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# Tests / outils
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+logs/
+
+# Uploads et fichiers generes
+uploads/
+*.pdf
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+env/
+

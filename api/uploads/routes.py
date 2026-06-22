@@ -15,8 +15,20 @@ from security import get_current_user, user_can_access_module
 router = APIRouter(prefix="/api/uploads", tags=["uploads"])
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
-MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+ALLOWED_DOCUMENT_EXTENSIONS = {".pdf", ".ppt", ".pptx"}
+ALLOWED_DOCUMENT_CONTENT_TYPES = {
+    "",
+    "application/octet-stream",
+    "application/pdf",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+}
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 CLOUDINARY_FOLDER = os.getenv("CLOUDINARY_UPLOAD_FOLDER", "ivoirtrips/circuits")
+CLOUDINARY_DOCUMENT_FOLDER = os.getenv(
+    "CLOUDINARY_DOCUMENT_FOLDER",
+    "ivoirtrips/teambuilding/documents",
+)
 PUBLIC_CLOUDINARY_FOLDERS = {
     folder.strip().strip("/")
     for folder in os.getenv("PUBLIC_CLOUDINARY_FOLDERS", "ivoirtrips/teambuilding/msf").split(",")
@@ -75,7 +87,7 @@ async def upload_image(file: UploadFile = File(...), current_user=Depends(requir
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fichier vide")
 
     if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image trop lourde (max 5MB)")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image trop lourde (max 10MB)")
 
     ensure_cloudinary_configured()
 
@@ -108,6 +120,64 @@ async def upload_image(file: UploadFile = File(...), current_user=Depends(requir
         "filename": Path(file.filename).name,
         "url": secure_url,
         "public_id": upload_result.get("public_id"),
+        "size": len(content),
+        "content_type": content_type,
+    }
+
+
+@router.post("/document")
+async def upload_document(file: UploadFile = File(...), current_user=Depends(require_upload_access)):
+    if not file.filename:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fichier invalide")
+
+    filename = Path(file.filename).name
+    extension = Path(filename).suffix.lower()
+    if extension not in ALLOWED_DOCUMENT_EXTENSIONS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Format document non supporte")
+
+    content_type = (file.content_type or "").lower()
+    if content_type not in ALLOWED_DOCUMENT_CONTENT_TYPES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Type de document non supporte")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fichier vide")
+
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Document trop lourd (max 10MB)")
+
+    ensure_cloudinary_configured()
+
+    public_id = f"{uuid4().hex}{extension}"
+    document_stream = BytesIO(content)
+    document_stream.name = filename
+
+    try:
+        upload_result = cloudinary.uploader.upload(
+            document_stream,
+            folder=CLOUDINARY_DOCUMENT_FOLDER,
+            public_id=public_id,
+            resource_type="raw",
+            overwrite=False,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Impossible d envoyer le document vers Cloudinary",
+        ) from exc
+
+    secure_url = upload_result.get("secure_url")
+    if not secure_url:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Cloudinary n a pas retourne d URL document",
+        )
+
+    return {
+        "filename": filename,
+        "url": secure_url,
+        "public_id": upload_result.get("public_id"),
+        "resource_type": upload_result.get("resource_type"),
         "size": len(content),
         "content_type": content_type,
     }

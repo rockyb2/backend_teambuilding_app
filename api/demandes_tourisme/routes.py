@@ -76,6 +76,14 @@ def update_demande_tourisme_custom_statut(
     db_demande = crud_demande_tourisme.get_demande_tourisme_custom(db, demande_id)
     if not db_demande:
         raise HTTPException(status_code=404, detail="Demande tourisme personnalisee non trouvee")
+    if db_demande.statut != "nouvelle" or payload.statut != "contactee":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "L'utilisateur peut uniquement faire passer une nouvelle demande "
+                "au statut contactee. Les statuts suivants sont pilotes par les offres."
+            ),
+        )
 
     try:
         return crud_demande_tourisme.update_demande_tourisme_custom_statut(
@@ -101,7 +109,14 @@ def update_demande_tourisme_custom(
         raise HTTPException(status_code=404, detail="Demande tourisme personnalisee non trouvee")
 
     try:
-        return crud_demande_tourisme.update_demande_tourisme_custom(db, db_demande, payload)
+        payload = dict(payload)
+        payload["statut"] = db_demande.statut
+        return crud_demande_tourisme.update_demande_tourisme_custom(
+            db,
+            db_demande,
+            payload,
+            updated_by_id=getattr(current_user, "id_utilisateur", None),
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -156,6 +171,14 @@ def update_demande_tourisme_statut(
     db_demande = crud_demande_tourisme.get_demande_tourisme(db, demande_id)
     if not db_demande:
         raise HTTPException(status_code=404, detail="Demande tourisme non trouvee")
+    if db_demande.statut != "nouvelle" or payload.statut != "contactee":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "L'utilisateur peut uniquement faire passer une nouvelle demande "
+                "au statut contactee. Les statuts suivants sont pilotes par les offres."
+            ),
+        )
 
     try:
         return crud_demande_tourisme.update_demande_tourisme_statut(
@@ -180,7 +203,9 @@ def update_demande_tourisme(
     if not db_demande:
         raise HTTPException(status_code=404, detail="Demande tourisme non trouvee")
 
-    return crud_demande_tourisme.update_demande_tourisme(db, db_demande, payload)
+    updates = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+    updates["statut"] = db_demande.statut
+    return crud_demande_tourisme.update_demande_tourisme(db, db_demande, updates)
 
 
 @router.get(
@@ -213,13 +238,32 @@ def delete_demande_tourisme(
 
 @router.post("", response_model=DemandeTourismeRead, status_code=status.HTTP_201_CREATED)
 def create_demande_tourisme(payload: DemandeTourismeCreate, db: Session = Depends(get_db)):
-    db_demande = crud_demande_tourisme.create_demande_tourisme(db, payload)
+    db_demande = crud_demande_tourisme.create_demande_tourisme(
+        db,
+        payload,
+        source="site_web",
+    )
     try:
         subject, body, html_body = build_tourism_booking_email(db_demande)
         _send_tourism_notification(subject, body, html_body)
     except Exception as exc:
         print(f"Echec de l'envoi de l'email pour la demande tourisme {db_demande.id}: {exc}")
     return db_demande
+
+
+@router.post("/internal", response_model=DemandeTourismeRead, status_code=status.HTTP_201_CREATED)
+def create_demande_tourisme_internal(
+    payload: DemandeTourismeCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_module_access("tourisme")),
+):
+    source = "import_excel" if payload.source == "import_excel" else "crm"
+    return crud_demande_tourisme.create_demande_tourisme(
+        db,
+        payload,
+        source=source,
+        created_by_id=getattr(current_user, "id_utilisateur", None),
+    )
 
 @router.post("/custom", response_model=DemandeTourismeCustom, status_code=status.HTTP_201_CREATED)
 def create_demande_tourisme_custom(payload: dict, db: Session = Depends(get_db)):
@@ -240,10 +284,45 @@ def create_demande_tourisme_custom(payload: dict, db: Session = Depends(get_db))
             detail=f"Champs requis manquants: {', '.join(missing_fields)}",
         )
 
-    db_demande = crud_demande_tourisme.create_demande_tourisme_custom(db, payload)
+    db_demande = crud_demande_tourisme.create_demande_tourisme_custom(
+        db,
+        payload,
+        source="site_web",
+    )
     try:
         subject, body, html_body = build_custom_tourism_email(db_demande)
         _send_tourism_notification(subject, body, html_body)
     except Exception as exc:
         print(f"Echec de l'envoi de l'email pour la demande tourisme custom {db_demande.id}: {exc}")
     return db_demande
+
+
+@router.post("/custom/internal", response_model=DemandeTourismeCustom, status_code=status.HTTP_201_CREATED)
+def create_demande_tourisme_custom_internal(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_module_access("tourisme")),
+):
+    if not (payload.get("prenom") or payload.get("prenoms") or payload.get("prenoms_client")):
+        raise HTTPException(status_code=422, detail="Le champ prenom/prenoms est requis")
+
+    missing_fields = []
+    if not (payload.get("nom") or payload.get("nom_client")):
+        missing_fields.append("nom")
+    if not (payload.get("email") or payload.get("email_client")):
+        missing_fields.append("email")
+    if not (payload.get("telephone") or payload.get("numero_telephone_client")):
+        missing_fields.append("telephone")
+
+    if missing_fields:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Champs requis manquants: {', '.join(missing_fields)}",
+        )
+
+    return crud_demande_tourisme.create_demande_tourisme_custom(
+        db,
+        payload,
+        source="crm",
+        created_by_id=getattr(current_user, "id_utilisateur", None),
+    )

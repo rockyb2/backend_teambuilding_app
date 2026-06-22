@@ -34,8 +34,13 @@ def get_site(site_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=SiteRead, status_code=status.HTTP_201_CREATED)
-def create_site(payload: SiteCreate, db: Session = Depends(get_db)):
+def create_site(
+    payload: SiteCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_module_access("teambuilding")),
+):
     """Créer un nouveau site"""
+    payload.id_utilisateur_create = getattr(current_user, "id_utilisateur", None)
     return crud_site.create_site(db, payload)
 
 

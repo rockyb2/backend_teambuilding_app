@@ -1,4 +1,5 @@
 from typing import Optional
+
 from sqlalchemy.orm import Session
 
 from database.models import ActiviteJeu
@@ -12,18 +13,27 @@ def _model_dump(schema_obj, **kwargs):
 
 
 def get_activite_jeu(db: Session, activite_id: int, jeu_id: int) -> Optional[ActiviteJeu]:
-    return db.query(ActiviteJeu).filter(
-        ActiviteJeu.id_activite == activite_id,
-        ActiviteJeu.id_jeu == jeu_id
-    ).first()
+    return (
+        db.query(ActiviteJeu)
+        .filter(
+            ActiviteJeu.activite_id == activite_id,
+            ActiviteJeu.jeu_id == jeu_id,
+        )
+        .first()
+    )
 
 
-def get_activite_jeux(db: Session, activite_id: int) -> list[ActiviteJeu]:
-    return db.query(ActiviteJeu).filter(ActiviteJeu.id_activite == activite_id).all()
+def get_activites_jeux(db: Session, skip: int = 0, limit: int = 100) -> list[ActiviteJeu]:
+    return db.query(ActiviteJeu).offset(skip).limit(limit).all()
 
 
 def get_jeux_by_activite(db: Session, activite_id: int) -> list[ActiviteJeu]:
-    return db.query(ActiviteJeu).filter(ActiviteJeu.id_activite == activite_id).order_by(ActiviteJeu.ordre).all()
+    return (
+        db.query(ActiviteJeu)
+        .filter(ActiviteJeu.activite_id == activite_id)
+        .order_by(ActiviteJeu.ordre.asc().nulls_last())
+        .all()
+    )
 
 
 def create_activite_jeu(db: Session, payload: ActiviteJeuCreate) -> ActiviteJeu:
@@ -35,9 +45,10 @@ def create_activite_jeu(db: Session, payload: ActiviteJeuCreate) -> ActiviteJeu:
 
 
 def update_activite_jeu(db: Session, db_activite_jeu: ActiviteJeu, payload: dict) -> ActiviteJeu:
-    updates = {k: v for k, v in payload.items() if v is not None}
+    updates = dict(payload)
     for key, value in updates.items():
-        setattr(db_activite_jeu, key, value)
+        if hasattr(db_activite_jeu, key):
+            setattr(db_activite_jeu, key, value)
     db.commit()
     db.refresh(db_activite_jeu)
     return db_activite_jeu
