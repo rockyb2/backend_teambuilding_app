@@ -21,6 +21,7 @@ from api.materiels_production import router as materiels_production_router
 from api.depenses import router as depenses_router
 from api.categories_depenses import router as categories_depenses_router
 from api.benevoles import router as benevoles_router
+from api.dashboard_admin import router as dashboard_admin_router
 from api.dashboard_teambuilding import router as dashboard_teambuilding_router
 from api.demandes_contact import router as demandes_contact_router
 from api.demandes_team_building import router as demandes_team_building_router
@@ -56,6 +57,7 @@ def include_api_routes(app):
     app.include_router(depenses_router)
     app.include_router(categories_depenses_router)
     app.include_router(benevoles_router)
+    app.include_router(dashboard_admin_router)
     app.include_router(dashboard_teambuilding_router)
     app.include_router(demandes_contact_router)
     app.include_router(demandes_team_building_router)
