@@ -22,8 +22,21 @@ from security import get_user_role_name, require_module_access
 router = APIRouter(prefix="/api/demandes-tourisme", tags=["demandes tourisme"])
 
 
-def _send_tourism_notification(subject: str, body: str, html_body: str | None = None) -> None:
-    send_notification_email(subject=subject, body=body, html_body=html_body, profile="VOYAGE")
+def _send_tourism_notification(
+    subject: str,
+    body: str,
+    html_body: str | None = None,
+    sender_email: str | None = None,
+    sender_name: str | None = None,
+) -> None:
+    send_notification_email(
+        subject=subject,
+        body=body,
+        html_body=html_body,
+        profile="VOYAGE",
+        sender_email=sender_email,
+        sender_name=sender_name,
+    )
 
 
 def _ensure_can_delete_demande(current_user) -> None:
@@ -245,7 +258,13 @@ def create_demande_tourisme(payload: DemandeTourismeCreate, db: Session = Depend
     )
     try:
         subject, body, html_body = build_tourism_booking_email(db_demande)
-        _send_tourism_notification(subject, body, html_body)
+        _send_tourism_notification(
+            subject,
+            body,
+            html_body,
+            sender_email=db_demande.email,
+            sender_name=f"{db_demande.prenom} {db_demande.nom}",
+        )
     except Exception as exc:
         print(f"Echec de l'envoi de l'email pour la demande tourisme {db_demande.id}: {exc}")
     return db_demande
@@ -291,7 +310,13 @@ def create_demande_tourisme_custom(payload: dict, db: Session = Depends(get_db))
     )
     try:
         subject, body, html_body = build_custom_tourism_email(db_demande)
-        _send_tourism_notification(subject, body, html_body)
+        _send_tourism_notification(
+            subject,
+            body,
+            html_body,
+            sender_email=db_demande.email_client,
+            sender_name=f"{db_demande.prenoms_client} {db_demande.nom_client}",
+        )
     except Exception as exc:
         print(f"Echec de l'envoi de l'email pour la demande tourisme custom {db_demande.id}: {exc}")
     return db_demande

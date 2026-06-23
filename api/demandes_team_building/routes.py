@@ -16,8 +16,21 @@ from security import get_user_role_name, require_module_access
 router = APIRouter(prefix="/api/demandes-team-building", tags=["demandes team building"])
 
 
-def _send_team_building_notification(subject: str, body: str, html_body: str | None = None) -> None:
-    send_notification_email(subject=subject, body=body, html_body=html_body, profile="TEAMBUILDING")
+def _send_team_building_notification(
+    subject: str,
+    body: str,
+    html_body: str | None = None,
+    sender_email: str | None = None,
+    sender_name: str | None = None,
+) -> None:
+    send_notification_email(
+        subject=subject,
+        body=body,
+        html_body=html_body,
+        profile="TEAMBUILDING",
+        sender_email=sender_email,
+        sender_name=sender_name,
+    )
 
 
 def _ensure_can_delete_demande(current_user) -> None:
@@ -125,7 +138,13 @@ def create_demande_team_building(payload: DemandeTeamBuildingCreate, db: Session
     )
     try:
         subject, body, html_body = build_team_building_email(db_demande)
-        _send_team_building_notification(subject, body, html_body)
+        _send_team_building_notification(
+            subject,
+            body,
+            html_body,
+            sender_email=db_demande.email_contact,
+            sender_name=db_demande.nom_contact,
+        )
     except Exception as exc:
         print(f"Echec de l'envoi de l'email pour la demande team building {db_demande.id}: {exc}")
     return db_demande

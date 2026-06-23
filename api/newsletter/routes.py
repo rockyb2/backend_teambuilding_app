@@ -69,7 +69,14 @@ def _build_newsletter_update_payload(payload: dict) -> NewsletterSubscriptionUpd
 
 def _send_newsletter_notification(db_subscription) -> None:
     subject, body, html_body = build_newsletter_subscription_email(db_subscription)
-    send_notification_email(subject=subject, body=body, html_body=html_body, profile="NEWSLETTER")
+    send_notification_email(
+        subject=subject,
+        body=body,
+        html_body=html_body,
+        profile="NEWSLETTER",
+        sender_email=db_subscription.email,
+        sender_name=db_subscription.email,
+    )
 
 
 @router.get("", response_model=List[NewsletterSubscriptionRead])

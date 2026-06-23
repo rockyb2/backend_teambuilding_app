@@ -12,8 +12,21 @@ from security import require_module_access
 router = APIRouter(prefix="/api/demandes-contact", tags=["demandes contact"])
 
 
-def _send_contact_notification(subject: str, body: str, html_body: str | None = None) -> None:
-    send_notification_email(subject=subject, body=body, html_body=html_body, profile="CONTACT")
+def _send_contact_notification(
+    subject: str,
+    body: str,
+    html_body: str | None = None,
+    sender_email: str | None = None,
+    sender_name: str | None = None,
+) -> None:
+    send_notification_email(
+        subject=subject,
+        body=body,
+        html_body=html_body,
+        profile="CONTACT",
+        sender_email=sender_email,
+        sender_name=sender_name,
+    )
 
 
 @router.get("", response_model=List[DemandeContactRead])
@@ -48,7 +61,13 @@ def create_demande_contact(payload: dict, db: Session = Depends(get_db)):
     db_demande = crud_demande_contact.create_demande_contact(db, validated_payload)
     try:
         subject, body, html_body = build_contact_email(db_demande)
-        _send_contact_notification(subject, body, html_body)
+        _send_contact_notification(
+            subject,
+            body,
+            html_body,
+            sender_email=db_demande.email,
+            sender_name=db_demande.nom_complet,
+        )
     except Exception as exc:
         print(f"Echec de l'envoi de l'email pour la demande contact {db_demande.id}: {exc}")
     return {

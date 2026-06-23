@@ -2,6 +2,7 @@ import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formataddr
 from html import escape
 
 from core.env_loader import load_local_env
@@ -14,6 +15,17 @@ def _get_bool_env(name: str, default: bool) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _clean_header_value(value: str | None) -> str:
+    return str(value or "").replace("\r", " ").replace("\n", " ").strip()
+
+
+def _clean_email(value: str | None) -> str:
+    email = _clean_header_value(value)
+    if not email or "@" not in email:
+        return ""
+    return email
 
 
 def is_email_enabled() -> bool:
@@ -51,6 +63,10 @@ def send_email(
     to_emails: list[str],
     html_body: str | None = None,
     profile: str | None = None,
+    sender_email: str | None = None,
+    sender_name: str | None = None,
+    reply_to_email: str | None = None,
+    reply_to_name: str | None = None,
 ) -> None:
     settings = _get_smtp_settings(profile)
     smtp_host = settings["host"]
@@ -67,10 +83,17 @@ def send_email(
     if not smtp_host or not smtp_username or not smtp_password or not from_email:
         raise ValueError("Configuration SMTP incomplète")
 
+    visible_from_email = _clean_email(sender_email) or from_email
+    visible_from_name = _clean_header_value(sender_name)
+    reply_email = _clean_email(reply_to_email) or _clean_email(sender_email)
+    reply_name = _clean_header_value(reply_to_name) or visible_from_name
+
     message = MIMEMultipart("alternative") if html_body else MIMEMultipart()
-    message["From"] = from_email
+    message["From"] = formataddr((visible_from_name, visible_from_email))
     message["To"] = ", ".join(recipients)
-    message["Subject"] = subject
+    message["Subject"] = _clean_header_value(subject)
+    if reply_email:
+        message["Reply-To"] = formataddr((reply_name, reply_email))
     message.attach(MIMEText(body, "plain", "utf-8"))
     if html_body:
         message.attach(MIMEText(html_body, "html", "utf-8"))
@@ -92,6 +115,8 @@ def send_notification_email(
     body: str,
     html_body: str | None = None,
     profile: str | None = None,
+    sender_email: str | None = None,
+    sender_name: str | None = None,
 ) -> None:
     if not is_email_enabled():
         return
@@ -103,10 +128,20 @@ def send_notification_email(
 
     print(
         f"SMTP notification profile={profile or 'DEFAULT'} "
-        f"from={settings['from_email']} to={recipient}"
+        f"from={sender_email or settings['from_email']} to={recipient}"
     )
 
-    send_email(subject=subject, body=body, html_body=html_body, to_emails=[recipient], profile=profile)
+    send_email(
+        subject=subject,
+        body=body,
+        html_body=html_body,
+        to_emails=[recipient],
+        profile=profile,
+        sender_email=sender_email,
+        sender_name=sender_name,
+        reply_to_email=sender_email,
+        reply_to_name=sender_name,
+    )
 
 
 def _normalize_value(value) -> str:
