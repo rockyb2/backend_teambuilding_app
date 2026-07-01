@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from typing import Optional
 
@@ -13,6 +14,7 @@ from services.proforma_pdf import BASE_DIR, calculate_totals, generate_proforma_
 
 
 PROFORMA_REFERENCE_PREFIX = "PRO"
+TOURISM_AGENCY_FEE_RATE = Decimal("0.20")
 
 
 def _model_dump(schema_obj, **kwargs):
@@ -115,10 +117,21 @@ def generate_proforma_reference(db: Session, created_at: datetime | None = None)
 
 
 def _prepare_values(values: dict) -> dict:
+    sections = values.get("sections") or []
+    vat_rate = values.get("taux_tva_frais_agence") or 18
+    agency_fees = values.get("frais_agence") or 0
+
+    if values.get("pole") == "tourisme":
+        tourism_totals = calculate_totals(sections, 0, vat_rate)
+        agency_fees = (tourism_totals["sous_total_ht"] * TOURISM_AGENCY_FEE_RATE).quantize(
+            Decimal("1"),
+            rounding=ROUND_HALF_UP,
+        )
+
     totals = calculate_totals(
-        values.get("sections") or [],
-        values.get("frais_agence") or 0,
-        values.get("taux_tva_frais_agence") or 18,
+        sections,
+        agency_fees,
+        vat_rate,
     )
     values["sections"] = totals["sections"]
     values["frais_agence"] = totals["frais_agence"]

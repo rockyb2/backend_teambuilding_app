@@ -253,6 +253,56 @@ class OffreTourisme(Base):
     proformas = relationship("Proforma", back_populates="offre_tourisme")
 
 
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('active', 'qualified', 'closed', 'abandoned')",
+            name="ck_chat_sessions_status",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_token = Column(String(100), nullable=False, unique=True, index=True)
+    source = Column(String(50), nullable=False, default="site_web", server_default=text("'site_web'"))
+    locale = Column(String(10), nullable=True)
+    status = Column(String(30), nullable=False, default="active", server_default=text("'active'"))
+    visitor_name = Column(String(255), nullable=True)
+    visitor_email = Column(String(255), nullable=True)
+    visitor_phone = Column(String(50), nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    messages = relationship(
+        "ChatMessage",
+        back_populates="session",
+        cascade="all, delete-orphan",
+    )
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('user', 'assistant', 'system')",
+            name="ck_chat_messages_role",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(
+        Integer,
+        ForeignKey("chat_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    role = Column(String(20), nullable=False)
+    content = Column(Text, nullable=False)
+    message_metadata = Column("metadata", JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+
+    session = relationship("ChatSession", back_populates="messages")
+
 class Site(Base):
     __tablename__ = "site"
     __table_args__ = (CheckConstraint("capacite > 0", name="ck_site_capacite_pos"),)
@@ -1222,6 +1272,7 @@ class DemandeContact(Base):
     id = Column(Integer, primary_key=True, index=True)
     nom_complet = Column(String(255), nullable=False)
     email = Column(String(255), nullable=False, index=True)
+    telephone = Column(String(50), nullable=True)
     sujet = Column(String(120), nullable=True)
     message = Column(Text, nullable=False)
     type_demande = Column(

@@ -22,8 +22,13 @@ Cela creera:
 Dans Render, renseigne les variables suivantes si elles sont utilisees:
 - `CORS_ORIGINS`
 - `MISTRAL_API_KEY`
-- `BREVO_API_KEY`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USERBOT`
+- `SMTP_PASSWORD`
 - `SENDER_EMAIL`
+- `SENDER_NAME`
+- `SALES_EMAIL`
 - `LANGFUSE_SECRET_KEY`
 - `LANGFUSE_PUBLIC_KEY`
 - `LANGFUSE_BASE_URL`

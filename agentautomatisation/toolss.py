@@ -9,23 +9,26 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import cm
-from openpyxl import Workbook
+from copy import copy
+from pathlib import Path
+
+from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.worksheet.table import Table, TableStyleInfo
+from openpyxl.utils import get_column_letter
 from openpyxl.chart import BarChart, Reference
 from openpyxl.drawing.image import Image
 import os
 import json
 
-# from email.mime.text import MIMEText
-# from email.mime.multipart import MIMEMultipart
-# from email.mime.base import MIMEBase
-# from email import encoders
-# import smtplib
-import sib_api_v3_sdk
-from sib_api_v3_sdk.rest import ApiException
-import base64
+from email import encoders
+from email.header import Header
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.utils import formataddr
 import os
+import smtplib
 import logging
 from typing import Optional
 
@@ -68,66 +71,271 @@ class BuildExcelPro(Tool):
 
     output_type = "string"
 
+    cotation_headers = {
+        "categorie",
+        "poste",
+        "description",
+        "quantite",
+        "prix unitaire estimatif",
+        "total estimatif",
+        "notes",
+    }
+    template_path = (
+        Path(__file__).resolve().parents[1]
+        / "assets"
+        / "proforma"
+        / "cotation_template.xlsx"
+    )
+
+    def _is_cotation(self, headers):
+        normalized_headers = {str(header or "").strip().lower() for header in headers or []}
+        return self.cotation_headers.issubset(normalized_headers)
+
+    def _save_path(self, name: str) -> Path:
+        file_path = Path(f"{name}.xlsx")
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        return file_path
+
+    def _row_dict(self, headers, row):
+        return {
+            str(header or "").strip().lower(): row[index] if index < len(row) else ""
+            for index, header in enumerate(headers)
+        }
+
+    def _as_number(self, value, default=0):
+        if isinstance(value, bool):
+            return default
+        if isinstance(value, (int, float)):
+            return value
+        text = str(value or "").replace(" ", "").replace(",", ".")
+        try:
+            return float(text)
+        except ValueError:
+            return default
+
+    def _clean_text(self, value, fallback="A completer"):
+        text = str(value or "").strip()
+        return text if text else fallback
+
+    def _metadata_and_items(self, headers, rows):
+        metadata = {}
+        items = []
+
+        for row in rows or []:
+            row_data = self._row_dict(headers, row)
+            category = self._clean_text(row_data.get("categorie"), "")
+            post = self._clean_text(row_data.get("poste"), "")
+
+            if category.lower() == "dossier":
+                metadata[post.lower()] = self._clean_text(row_data.get("description"), "")
+                continue
+            if category.lower() == "total":
+                continue
+
+            items.append(
+                {
+                    "category": category or "Cotation",
+                    "post": post or "Poste a completer",
+                    "description": self._clean_text(row_data.get("description"), ""),
+                    "quantity": self._as_number(row_data.get("quantite"), 1) or 1,
+                    "unit_price": self._as_number(row_data.get("prix unitaire estimatif"), 0),
+                    "total": self._as_number(row_data.get("total estimatif"), 0),
+                    "notes": self._clean_text(row_data.get("notes"), ""),
+                }
+            )
+
+        return metadata, items
+
+    def _copy_cell_style(self, source, target):
+        target.font = copy(source.font)
+        target.fill = copy(source.fill)
+        target.border = copy(source.border)
+        target.alignment = copy(source.alignment)
+        target.number_format = source.number_format
+        target.protection = copy(source.protection)
+
+    def _copy_row_style(self, ws, source_row, target_row, min_col=2, max_col=7):
+        ws.row_dimensions[target_row].height = ws.row_dimensions[source_row].height
+        for col_index in range(min_col, max_col + 1):
+            self._copy_cell_style(ws.cell(source_row, col_index), ws.cell(target_row, col_index))
+
+    def _fill_merged_row(self, ws, row_index, value, source_row=16):
+        ws.merge_cells(start_row=row_index, start_column=2, end_row=row_index, end_column=7)
+        self._copy_row_style(ws, source_row, row_index)
+        cell = ws.cell(row_index, 2)
+        cell.value = value
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    def _write_item_row(self, ws, row_index, item, source_row=17):
+        self._copy_row_style(ws, source_row, row_index)
+        label = item["post"]
+        if item["description"] and item["description"].lower() != label.lower():
+            label = f"{label} - {item['description']}"
+
+        ws.cell(row_index, 2).value = label
+        ws.cell(row_index, 3).value = item["quantity"]
+        ws.cell(row_index, 4).value = item["unit_price"]
+        ws.cell(row_index, 5).value = 1
+        ws.cell(row_index, 6).value = f"=C{row_index}*D{row_index}*E{row_index}"
+        ws.cell(row_index, 7).value = item["notes"]
+
+        ws.cell(row_index, 2).alignment = Alignment(wrap_text=True, vertical="center")
+        ws.cell(row_index, 3).alignment = Alignment(horizontal="center", vertical="center")
+        ws.cell(row_index, 5).alignment = Alignment(horizontal="center", vertical="center")
+        ws.cell(row_index, 6).number_format = '#,##0 "CFA"'
+
+    def _write_subtotal_row(self, ws, row_index, category, first_row, last_row, source_row=19):
+        self._copy_row_style(ws, source_row, row_index)
+        ws.cell(row_index, 3).value = f"SOUS-TOTAL {category.upper()}"
+        ws.cell(row_index, 6).value = f"=SUM(F{first_row}:F{last_row})"
+        ws.cell(row_index, 6).number_format = '#,##0 "CFA"'
+        return ws.cell(row_index, 6).coordinate
+
+    def _build_cotation_from_template(self, name, headers, rows):
+        if not self.template_path.is_file():
+            return None
+
+        metadata, items = self._metadata_and_items(headers, rows)
+        if not items:
+            return None
+
+        wb = load_workbook(self.template_path)
+        ws = wb.worksheets[0]
+        ws.title = "COTATION"
+        for sheet in list(wb.worksheets)[1:]:
+            wb.remove(sheet)
+
+        ws["C9"] = metadata.get("date/periode") or metadata.get("date") or "=TODAY()"
+        ws["F9"] = metadata.get("lieu") or metadata.get("lieu souhaite") or "A completer"
+        ws["C10"] = metadata.get("client") or "Client a completer"
+        ws["F10"] = metadata.get("duree") or 1
+        ws["C11"] = (
+            self._as_number(metadata.get("participants"), metadata.get("nombre_personnes") or 0)
+            or "A completer"
+        )
+        ws["F11"] = metadata.get("nuits") or ""
+        ws["G15"] = "Notes"
+        ws.column_dimensions["G"].width = 34
+        self._copy_cell_style(ws["F15"], ws["G15"])
+
+        template_max_row = ws.max_row
+        for merged_range in list(ws.merged_cells.ranges):
+            if merged_range.min_row >= 16:
+                ws.unmerge_cells(str(merged_range))
+        for row in range(16, template_max_row + 1):
+            for col in range(2, 8):
+                ws.cell(row, col).value = None
+
+        grouped_items = []
+        for item in items:
+            if not grouped_items or grouped_items[-1][0] != item["category"]:
+                grouped_items.append((item["category"], []))
+            grouped_items[-1][1].append(item)
+
+        row_index = 16
+        subtotal_cells = []
+        for category, category_items in grouped_items:
+            self._fill_merged_row(ws, row_index, category.upper(), source_row=15)
+            row_index += 1
+            first_item_row = row_index
+
+            for item in category_items:
+                self._write_item_row(ws, row_index, item)
+                row_index += 1
+
+            subtotal_cells.append(
+                self._write_subtotal_row(
+                    ws,
+                    row_index,
+                    category,
+                    first_item_row,
+                    row_index - 1,
+                )
+            )
+            row_index += 2
+
+        self._write_subtotal_row(ws, row_index, "MISE EN OEUVRE", row_index, row_index)
+        ws.cell(row_index, 6).value = f"=SUM({','.join(subtotal_cells)})" if subtotal_cells else 0
+        implementation_total_cell = ws.cell(row_index, 6).coordinate
+        row_index += 2
+
+        self._copy_row_style(ws, 19, row_index)
+        ws.cell(row_index, 4).value = "TOTAL ESTIMATIF"
+        ws.cell(row_index, 6).value = f"={implementation_total_cell}"
+        ws.cell(row_index, 6).number_format = '#,##0 "CFA"'
+        row_index += 2
+
+        self._fill_merged_row(ws, row_index, "NOTES INTERNES", source_row=15)
+        row_index += 1
+        self._copy_row_style(ws, 17, row_index)
+        ws.merge_cells(start_row=row_index, start_column=2, end_row=row_index, end_column=7)
+        notes = [
+            "Cotation brouillon interne a verifier avant envoi au client.",
+            "Les montants restent indicatifs et doivent etre valides par l'equipe commerciale.",
+        ]
+        budget = metadata.get("budget") or metadata.get("budget estime")
+        if budget:
+            notes.append(f"Budget indique par le client: {budget}")
+        ws.cell(row_index, 2).value = "\n".join(notes)
+        ws.cell(row_index, 2).alignment = Alignment(wrap_text=True, vertical="top")
+        ws.row_dimensions[row_index].height = 58
+
+        ws.print_area = f"B1:G{row_index}"
+        ws.sheet_view.showGridLines = False
+        if hasattr(wb, "calculation"):
+            wb.calculation.fullCalcOnLoad = True
+
+        file_path = self._save_path(name)
+        wb.save(file_path)
+        return str(file_path)
+
+    def _build_simple_workbook(self, name, headers, rows):
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Feuille1"
+
+        ws.append(headers)
+        for cell in ws[1]:
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill("solid", fgColor="4472C4")
+            cell.alignment = Alignment(horizontal="center")
+
+        for row in rows:
+            ws.append(row)
+
+        last_row = ws.max_row
+        last_col = ws.max_column
+        table = Table(
+            displayName="Table1",
+            ref=f"A1:{get_column_letter(last_col)}{last_row}",
+        )
+        style = TableStyleInfo(
+            name="TableStyleMedium9",
+            showFirstColumn=False,
+            showLastColumn=False,
+            showRowStripes=True,
+            showColumnStripes=False
+        )
+        table.tableStyleInfo = style
+        ws.add_table(table)
+
+        for col in ws.columns:
+            max_length = max(len(str(c.value)) for c in col)
+            ws.column_dimensions[col[0].column_letter].width = max_length + 2
+
+        file_path = self._save_path(name)
+        wb.save(file_path)
+        return str(file_path)
+
     def forward(self, name, headers, rows, ):
         try:
-            wb = Workbook()
-            ws = wb.active
-            ws.title = "Feuille1"
+            file_name = None
+            if self._is_cotation(headers):
+                file_name = self._build_cotation_from_template(name, headers, rows)
+            if not file_name:
+                file_name = self._build_simple_workbook(name, headers, rows)
 
-            # ---- EN-TÊTES ----
-            ws.append(headers)
-            for cell in ws[1]:
-                cell.font = Font(bold=True, color="FFFFFF")
-                cell.fill = PatternFill("solid", fgColor="4472C4")
-                cell.alignment = Alignment(horizontal="center")
-
-            # ---- LIGNES ----
-            for row in rows:
-                ws.append(row)
-
-            # ---- TABLE STYLE ----
-            last_row = ws.max_row
-            last_col = ws.max_column
-            table = Table(
-                displayName="Table1",
-                ref=f"A1:{chr(64 + last_col)}{last_row}"
-            )
-            style = TableStyleInfo(
-                name="TableStyleMedium9",
-                showFirstColumn=False,
-                showLastColumn=False,
-                showRowStripes=True,
-                showColumnStripes=False
-            )
-            table.tableStyleInfo = style
-            ws.add_table(table)
-
-            # ---- AUTO-WIDTH ----
-            for col in ws.columns:
-                max_length = max(len(str(c.value)) for c in col)
-                ws.column_dimensions[col[0].column_letter].width = max_length + 2
-
-            # ---- GRAPHIQUE ----
-            # if chart:
-            #     chart_obj = BarChart()
-            #     chart_obj.title = "Graphique des données"
-
-            #     data = Reference(ws, min_col=2, min_row=1,
-            #                     max_row=last_row, max_col=last_col)
-            #     chart_obj.add_data(data, titles_from_data=True)
-
-            #     cats = Reference(ws, min_col=1, min_row=2, max_row=last_row)
-            #     chart_obj.set_categories(cats)
-
-            #     ws.add_chart(chart_obj, f"{chr(66 + last_col)}2")
-
-            
-
-            # ---- SAUVEGARDE ----
-            file_name = f"{name}.xlsx"
-            wb.save(file_name)
-
-            return f"Excel '{file_name}' généré avec succès !||{file_name}"
+            return f"Excel '{file_name}' genere avec succes !||{file_name}"
 
         except Exception as e:
             return f"Erreur Excel Pro : {e}"
@@ -643,8 +851,8 @@ class BuildWord(Tool):
 #             logger.error(f"Erreur envoi email: {e}")
 #             return f"Erreur lors de l'envoi du mail : {e}"
 
-class SendMail(Tool):
-    name = "send_mail"
+class BrevoSendMailDeprecated(Tool):
+    name = "send_mail_brevo_deprecated"
     description = (
         "Envoie un email via Brevo (Sendinblue) avec support HTML "
         "et pièce jointe optionnelle."
@@ -708,4 +916,98 @@ class SendMail(Tool):
         except ApiException as e:
             return f"Erreur Brevo API : {e}"
         except Exception as e:
+            return f"Erreur lors de l'envoi de l'email : {e}"
+
+
+class SendMail(Tool):
+    name = "send_mail"
+    description = (
+        "Envoie un email via SMTP Zoho avec support HTML "
+        "et piece jointe optionnelle."
+    )
+
+    inputs = {
+        "recipient_email": {"type": "string", "description": "Email du destinataire"},
+        "subject": {"type": "string", "description": "Sujet de l'email"},
+        "message": {"type": "string", "description": "Contenu du message HTML ou texte"},
+        "is_html": {"type": "boolean", "description": "Message HTML ?", "nullable": True},
+        "attachment_path": {"type": "string", "description": "Chemin du fichier joint", "nullable": True},
+    }
+
+    output_type = "string"
+
+    def forward(
+        self,
+        recipient_email: str,
+        subject: str,
+        message: str,
+        is_html: bool = False,
+        attachment_path: Optional[str] = None,
+    ) -> str:
+        try:
+            smtp_host = os.getenv("SMTP_HOST", "smtppro.zoho.com")
+            smtp_port = int(os.getenv("SMTP_PORT", "465"))
+            smtp_user = os.getenv("SMTP_USER") or os.getenv("SMTP_USERBOT")
+            smtp_password = os.getenv("SMTP_PASSWORD")
+            sender_email = os.getenv("SENDER_EMAIL") or smtp_user
+            sender_name = os.getenv("SENDER_NAME", "IVOIR TRIPS INTERNATIONAL")
+
+            if not all([smtp_host, smtp_port, smtp_user, smtp_password, sender_email]):
+                return (
+                    "Erreur SMTP: configuration email incomplete. "
+                    "Verifiez SMTP_HOST, SMTP_PORT, SMTP_USERBOT, SMTP_PASSWORD et SENDER_EMAIL."
+                )
+
+            recipients = [
+                email.strip()
+                for email in recipient_email.split(",")
+                if email.strip()
+            ]
+            if not recipients:
+                return "Erreur SMTP: aucun destinataire valide."
+
+            email_message = MIMEMultipart()
+            email_message["From"] = formataddr((str(Header(sender_name, "utf-8")), sender_email))
+            email_message["To"] = ", ".join(recipients)
+            email_message["Subject"] = str(Header(subject, "utf-8"))
+            email_message["Reply-To"] = sender_email
+
+            body_type = "html" if is_html else "plain"
+            email_message.attach(MIMEText(message, body_type, "utf-8"))
+
+            if attachment_path and os.path.isfile(attachment_path):
+                with open(attachment_path, "rb") as f:
+                    attachment = MIMEBase("application", "octet-stream")
+                    attachment.set_payload(f.read())
+                encoders.encode_base64(attachment)
+                attachment.add_header(
+                    "Content-Disposition",
+                    "attachment",
+                    filename=os.path.basename(attachment_path),
+                )
+                email_message.attach(attachment)
+
+            if smtp_port == 465:
+                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30) as server:
+                    server.login(smtp_user, smtp_password)
+                    server.send_message(email_message)
+            else:
+                with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
+                    server.ehlo()
+                    server.starttls()
+                    server.ehlo()
+                    server.login(smtp_user, smtp_password)
+                    server.send_message(email_message)
+
+            return f"Email envoye avec succes a {', '.join(recipients)}"
+
+        except smtplib.SMTPAuthenticationError:
+            return (
+                "Erreur SMTP: authentification refusee. "
+                "Verifiez l'adresse Zoho et utilisez un mot de passe d'application si necessaire."
+            )
+        except smtplib.SMTPException as e:
+            return f"Erreur SMTP lors de l'envoi de l'email : {e}"
+        except Exception as e:
+            logger.error(f"Erreur envoi email SMTP: {e}")
             return f"Erreur lors de l'envoi de l'email : {e}"

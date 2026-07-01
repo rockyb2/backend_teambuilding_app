@@ -286,6 +286,7 @@ def build_contact_email(db_demande) -> tuple[str, str, str]:
     rows = [
         ("Nom complet", db_demande.nom_complet),
         ("E-mail", db_demande.email),
+        ("Téléphone", db_demande.telephone),
         ("Sujet", db_demande.sujet),
         ("Type de demande", db_demande.type_demande),
         ("Statut", db_demande.statut),

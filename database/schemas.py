@@ -845,6 +845,7 @@ class DemandeTeamBuildingRead(DemandeTeamBuildingBase):
 class DemandeContactBase(ORMBaseModel):
     nom_complet: str
     email: str
+    telephone: Optional[str] = None
     sujet: Optional[str] = None
     message: str
     type_demande: Optional[str] = "autre"
@@ -853,7 +854,7 @@ class DemandeContactBase(ORMBaseModel):
 
 
 class DemandeContactCreate(DemandeContactBase):
-    pass
+    telephone: str
 
 
 

@@ -13,6 +13,7 @@ from services.proforma_assistant import (
     search_best_sites,
 )
 from services.proforma_pdf import calculate_totals, generate_proforma_pdf
+from crud.proforma import _prepare_values
 
 
 class ProformaAssistantTests(unittest.TestCase):
@@ -78,6 +79,32 @@ class ProformaAssistantTests(unittest.TestCase):
         self.assertEqual(int(totals["sous_total_ht"]), 850000)
         self.assertEqual(int(totals["tva_frais_agence"]), 27000)
         self.assertEqual(int(totals["total_ttc"]), 1027000)
+
+    def test_tourism_proforma_agency_fee_is_20_percent_of_services(self):
+        values = _prepare_values(
+            {
+                "pole": "tourisme",
+                "sections": [
+                    {
+                        "nom": "Prestations touristiques",
+                        "prestations": [
+                            {
+                                "designation": "Circuit Assinie",
+                                "quantite": 1,
+                                "prix_unitaire": 1000000,
+                            }
+                        ],
+                    }
+                ],
+                "frais_agence": 0,
+                "taux_tva_frais_agence": 18,
+            }
+        )
+
+        self.assertEqual(int(values["sous_total_ht"]), 1000000)
+        self.assertEqual(int(values["frais_agence"]), 200000)
+        self.assertEqual(int(values["tva_frais_agence"]), 36000)
+        self.assertEqual(int(values["total_ttc"]), 1236000)
 
     def test_generate_pdf_creates_file(self):
         data = {

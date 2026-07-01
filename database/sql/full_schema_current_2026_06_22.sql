@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS demandes_contact (
 	id SERIAL NOT NULL, 
 	nom_complet VARCHAR(255) NOT NULL, 
 	email VARCHAR(255) NOT NULL, 
+	telephone VARCHAR(50), 
 	sujet VARCHAR(120), 
 	message TEXT NOT NULL, 
 	type_demande VARCHAR(30) DEFAULT 'autre' NOT NULL, 

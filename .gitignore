@@ -29,6 +29,7 @@ logs/
 
 # Uploads et fichiers generes
 uploads/
+generated_cotations/
 *.pdf
 
 # IDE / OS
@@ -37,4 +38,3 @@ uploads/
 .DS_Store
 Thumbs.db
 env/
-

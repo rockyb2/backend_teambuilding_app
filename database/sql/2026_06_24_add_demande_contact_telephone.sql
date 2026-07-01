@@ -1,0 +1,2 @@
+ALTER TABLE demandes_contact
+ADD COLUMN IF NOT EXISTS telephone VARCHAR(50);
