@@ -10,15 +10,12 @@ from sqlalchemy.orm import Session
 from api.dependencies import get_db
 from crud import depense as crud_depense
 from database.schemas import CategorieDepenseCreate, CategorieDepenseRead, CategorieDepenseUpdate
-from security import require_financial_access, require_module_access
+from security import require_financial_access
 
 router = APIRouter(
     prefix="/api/categories-depenses",
     tags=["categories_depenses"],
-    dependencies=[
-        Depends(require_module_access("teambuilding")),
-        Depends(require_financial_access),
-    ],
+    dependencies=[Depends(require_financial_access)],
 )
 
 

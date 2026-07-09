@@ -234,6 +234,90 @@ class ProformaRead(ProformaBase):
     updated_at: datetime
 
 
+FacturePole = Literal["teambuilding", "tourisme", "production"]
+FactureStatut = Literal["non_payee", "partiellement_payee", "payee", "annulee"]
+ModePaiementFacture = Literal[
+    "ESPECES",
+    "WAVE",
+    "ORANGE_MONEY",
+    "MTN_MONEY",
+    "VIREMENT",
+    "CHEQUE",
+    "CARTE_BANCAIRE",
+]
+
+
+class PaiementBase(ORMBaseModel):
+    montant: Decimal
+    date_paiement: Optional[date] = None
+    mode_paiement: Optional[ModePaiementFacture] = None
+    reference_transaction: Optional[str] = None
+
+
+class PaiementCreate(PaiementBase):
+    pass
+
+
+class PaiementUpdate(ORMBaseModel):
+    montant: Optional[Decimal] = None
+    date_paiement: Optional[date] = None
+    mode_paiement: Optional[ModePaiementFacture] = None
+    reference_transaction: Optional[str] = None
+
+
+class PaiementRead(PaiementBase):
+    id: int
+    facture_id: int
+    created_by_id: Optional[int] = None
+    updated_by_id: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class FactureBase(ORMBaseModel):
+    pole: FacturePole
+    numero_fne: Optional[str] = None
+    proforma_id: Optional[int] = None
+    demande_team_building_id: Optional[int] = None
+    demande_tourisme_id: Optional[int] = None
+    demande_tourisme_custom_id: Optional[int] = None
+    client: str
+    objet: Optional[str] = None
+    date_facture: Optional[date] = None
+    montant_facture: Decimal = Decimal("0")
+
+
+class FactureCreate(FactureBase):
+    pass
+
+
+class FactureUpdate(ORMBaseModel):
+    pole: Optional[FacturePole] = None
+    numero_fne: Optional[str] = None
+    proforma_id: Optional[int] = None
+    demande_team_building_id: Optional[int] = None
+    demande_tourisme_id: Optional[int] = None
+    demande_tourisme_custom_id: Optional[int] = None
+    client: Optional[str] = None
+    objet: Optional[str] = None
+    date_facture: Optional[date] = None
+    montant_facture: Optional[Decimal] = None
+    statut: Optional[FactureStatut] = None
+
+
+class FactureRead(FactureBase):
+    id: int
+    reference_interne: str
+    statut: FactureStatut
+    total_paye: Decimal
+    reste_a_payer: Decimal
+    created_by_id: Optional[int] = None
+    updated_by_id: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+    paiements: list[PaiementRead] = Field(default_factory=list)
+
+
 class ProformaAssistantSessionCreate(ORMBaseModel):
     demande_id: Optional[int] = None
     offre_id: Optional[int] = None
@@ -613,6 +697,7 @@ ModePaiementDepense = Literal[
     "CHEQUE",
     "CARTE_BANCAIRE",
 ]
+DepensePole = Literal["teambuilding", "tourisme", "production"]
 
 
 class CategorieDepenseBase(ORMBaseModel):
@@ -634,11 +719,17 @@ class CategorieDepenseRead(CategorieDepenseBase):
 class DepenseBase(ORMBaseModel):
     titre: str
     montant: Decimal
+    pole: DepensePole = "teambuilding"
     description: Optional[str] = None
     date_depense: Optional[date] = None
     categorie_depense_id: Optional[int] = None
     offre_id: Optional[int] = None
-    activite_id: int
+    activite_id: Optional[int] = None
+    proforma_id: Optional[int] = None
+    facture_id: Optional[int] = None
+    demande_team_building_id: Optional[int] = None
+    demande_tourisme_id: Optional[int] = None
+    demande_tourisme_custom_id: Optional[int] = None
     fournisseur: Optional[str] = None
     mode_paiement: Optional[ModePaiementDepense] = None
     type_depense: Optional[str] = None
@@ -653,11 +744,17 @@ class DepenseCreate(DepenseBase):
 class DepenseUpdate(ORMBaseModel):
     titre: Optional[str] = None
     montant: Optional[Decimal] = None
+    pole: Optional[DepensePole] = None
     description: Optional[str] = None
     date_depense: Optional[date] = None
     categorie_depense_id: Optional[int] = None
     offre_id: Optional[int] = None
     activite_id: Optional[int] = None
+    proforma_id: Optional[int] = None
+    facture_id: Optional[int] = None
+    demande_team_building_id: Optional[int] = None
+    demande_tourisme_id: Optional[int] = None
+    demande_tourisme_custom_id: Optional[int] = None
     fournisseur: Optional[str] = None
     mode_paiement: Optional[ModePaiementDepense] = None
     type_depense: Optional[str] = None

@@ -212,6 +212,63 @@ def _synchronize_proforma_constraints(connection):
     )
 
 
+def _synchronize_depense_constraints(connection):
+    if connection.dialect.name != "postgresql":
+        return
+
+    connection.execute(
+        text(
+            """
+            UPDATE public.depense
+            SET pole = 'teambuilding'
+            WHERE pole IS NULL
+            """
+        )
+    )
+    connection.execute(text("ALTER TABLE public.depense ALTER COLUMN activite_id DROP NOT NULL"))
+    connection.execute(text("ALTER TABLE public.depense DROP CONSTRAINT IF EXISTS ck_depense_pole"))
+    connection.execute(
+        text(
+            """
+            ALTER TABLE public.depense
+            ADD CONSTRAINT ck_depense_pole
+            CHECK (pole IN ('teambuilding', 'tourisme', 'production'))
+            """
+        )
+    )
+    connection.execute(text("ALTER TABLE public.depense DROP CONSTRAINT IF EXISTS depense_activite_id_fkey"))
+    connection.execute(
+        text(
+            """
+            ALTER TABLE public.depense
+            ADD CONSTRAINT depense_activite_id_fkey
+            FOREIGN KEY (activite_id) REFERENCES public.activite(id) ON DELETE SET NULL
+            """
+        )
+    )
+    connection.execute(text("CREATE INDEX IF NOT EXISTS ix_depense_pole ON public.depense (pole)"))
+    connection.execute(text("CREATE INDEX IF NOT EXISTS ix_depense_proforma_id ON public.depense (proforma_id)"))
+    connection.execute(text("CREATE INDEX IF NOT EXISTS ix_depense_facture_id ON public.depense (facture_id)"))
+    connection.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_depense_demande_team_building_id "
+            "ON public.depense (demande_team_building_id)"
+        )
+    )
+    connection.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_depense_demande_tourisme_id "
+            "ON public.depense (demande_tourisme_id)"
+        )
+    )
+    connection.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_depense_demande_tourisme_custom_id "
+            "ON public.depense (demande_tourisme_custom_id)"
+        )
+    )
+
+
 def create_tables():
     from database import models  # noqa: F401
 
@@ -253,6 +310,24 @@ def create_tables():
             "marque": "VARCHAR(100) NULL",
             "modele": "VARCHAR(150) NULL",
         },
+        "depense": {
+            "pole": "VARCHAR(30) NOT NULL DEFAULT 'teambuilding'",
+            "proforma_id": (
+                "INTEGER NULL REFERENCES proformas(id) ON DELETE SET NULL"
+            ),
+            "facture_id": (
+                "INTEGER NULL REFERENCES facture(id) ON DELETE SET NULL"
+            ),
+            "demande_team_building_id": (
+                "INTEGER NULL REFERENCES demandes_team_building(id) ON DELETE SET NULL"
+            ),
+            "demande_tourisme_id": (
+                "INTEGER NULL REFERENCES demandes_tourisme(id) ON DELETE SET NULL"
+            ),
+            "demande_tourisme_custom_id": (
+                "INTEGER NULL REFERENCES demandes_tourisme_custom(id) ON DELETE SET NULL"
+            ),
+        },
     }
 
     with engine.begin() as connection:
@@ -274,3 +349,4 @@ def create_tables():
         _synchronize_offre_status_constraint(connection)
         _synchronize_demande_tourisme_status_constraints(connection)
         _synchronize_proforma_constraints(connection)
+        _synchronize_depense_constraints(connection)

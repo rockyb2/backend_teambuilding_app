@@ -213,7 +213,11 @@ def get_dashboard(db: Session) -> dict:
         .filter(Offre.statut == "validee")
         .scalar()
     )
-    total_expenses = _money(db.query(func.coalesce(func.sum(Depense.montant), 0)).scalar())
+    total_expenses = _money(
+        db.query(func.coalesce(func.sum(Depense.montant), 0))
+        .filter(Depense.pole == "teambuilding")
+        .scalar()
+    )
     eligible_offers = db.query(Offre).filter(
         Offre.statut.in_(("envoyee", "validee", "refusee", "expiree"))
     ).count()

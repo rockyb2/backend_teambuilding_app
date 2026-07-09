@@ -31,7 +31,10 @@ CLOUDINARY_DOCUMENT_FOLDER = os.getenv(
 )
 PUBLIC_CLOUDINARY_FOLDERS = {
     folder.strip().strip("/")
-    for folder in os.getenv("PUBLIC_CLOUDINARY_FOLDERS", "ivoirtrips/teambuilding/msf").split(",")
+    for folder in os.getenv(
+        "PUBLIC_CLOUDINARY_FOLDERS",
+        "ivoirtrips/teambuilding/msf,ivoirtrips/teambuilding/canal+",
+    ).split(",")
     if folder.strip()
 }
 

@@ -2,6 +2,7 @@
 import hashlib
 import hmac
 import os
+from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
@@ -577,6 +578,10 @@ class Depense(Base):
     __table_args__ = (
         CheckConstraint("montant >= 0", name="ck_depense_montant_non_neg"),
         CheckConstraint(
+            "pole IN ('teambuilding','tourisme','production')",
+            name="ck_depense_pole",
+        ),
+        CheckConstraint(
             "mode_paiement IS NULL OR mode_paiement IN ("
             "'ESPECES',"
             "'WAVE',"
@@ -595,6 +600,13 @@ class Depense(Base):
     titre = Column(String(150), nullable=False)
     description = Column(Text, nullable=True)
     montant = Column(Numeric(12, 2), nullable=False)
+    pole = Column(
+        String(30),
+        nullable=False,
+        default="teambuilding",
+        server_default=text("'teambuilding'"),
+        index=True,
+    )
     date_depense = Column(Date, nullable=True, server_default=func.current_date())
     categorie_depense_id = Column(
         Integer,
@@ -603,7 +615,27 @@ class Depense(Base):
         index=True,
     )
     offre_id = Column(Integer, ForeignKey("offre.id", ondelete="SET NULL"), nullable=True, index=True)
-    activite_id = Column(Integer, ForeignKey("activite.id", ondelete="CASCADE"), nullable=False, index=True)
+    activite_id = Column(Integer, ForeignKey("activite.id", ondelete="SET NULL"), nullable=True, index=True)
+    proforma_id = Column(Integer, ForeignKey("proformas.id", ondelete="SET NULL"), nullable=True, index=True)
+    facture_id = Column(Integer, ForeignKey("facture.id", ondelete="SET NULL"), nullable=True, index=True)
+    demande_team_building_id = Column(
+        Integer,
+        ForeignKey("demandes_team_building.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    demande_tourisme_id = Column(
+        Integer,
+        ForeignKey("demandes_tourisme.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    demande_tourisme_custom_id = Column(
+        Integer,
+        ForeignKey("demandes_tourisme_custom.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     fournisseur = Column(String(255), nullable=True)
     mode_paiement = Column(String(50), nullable=True)
     type_depense = Column(String(100), nullable=True)
@@ -619,6 +651,11 @@ class Depense(Base):
     categorie = relationship("CategorieDepense", back_populates="depenses")
     offre = relationship("Offre", back_populates="depenses")
     activite = relationship("Activite", back_populates="depenses")
+    proforma = relationship("Proforma", back_populates="depenses")
+    facture = relationship("Facture", back_populates="depenses")
+    demande_team_building = relationship("DemandeTeamBuilding", back_populates="depenses")
+    demande_tourisme = relationship("DemandeTourisme", back_populates="depenses")
+    demande_tourisme_custom = relationship("DemandeTourismeCustom", back_populates="depenses")
 
 
 
@@ -685,6 +722,8 @@ class DemandeTeamBuilding(Base):
     offres = relationship("Offre", back_populates="demande", cascade="all, delete-orphan")
     activites = relationship("Activite", back_populates="demande")
     proformas = relationship("Proforma", back_populates="demande")
+    factures = relationship("Facture", back_populates="demande_team_building")
+    depenses = relationship("Depense", back_populates="demande_team_building")
 
     @property
     def created_by_nom_complet(self) -> str | None:
@@ -854,6 +893,127 @@ class Proforma(Base):
     offre_tourisme = relationship("OffreTourisme", back_populates="proformas")
     site = relationship("Site", back_populates="proformas")
     created_by = relationship("Utilisateur", foreign_keys=[created_by_id], back_populates="proformas_creees")
+    factures = relationship("Facture", back_populates="proforma")
+    depenses = relationship("Depense", back_populates="proforma")
+
+
+class Facture(Base):
+    __tablename__ = "facture"
+    __table_args__ = (
+        CheckConstraint(
+            "pole IN ('teambuilding','tourisme','production')",
+            name="ck_facture_pole",
+        ),
+        CheckConstraint(
+            "statut IN ('non_payee','partiellement_payee','payee','annulee')",
+            name="ck_facture_statut",
+        ),
+        CheckConstraint("montant_facture >= 0", name="ck_facture_montant_non_negatif"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    reference_interne = Column(String(50), nullable=False, unique=True, index=True)
+    numero_fne = Column(String(100), nullable=True, unique=True, index=True)
+    pole = Column(String(30), nullable=False, index=True)
+    proforma_id = Column(Integer, ForeignKey("proformas.id", ondelete="SET NULL"), nullable=True, index=True)
+    demande_team_building_id = Column(
+        Integer,
+        ForeignKey("demandes_team_building.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    demande_tourisme_id = Column(
+        Integer,
+        ForeignKey("demandes_tourisme.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    demande_tourisme_custom_id = Column(
+        Integer,
+        ForeignKey("demandes_tourisme_custom.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    client = Column(String(255), nullable=False)
+    objet = Column(String(255), nullable=True)
+    date_facture = Column(Date, nullable=False, server_default=func.current_date())
+    montant_facture = Column(Numeric(14, 2), nullable=False, default=0, server_default=text("0"))
+    statut = Column(String(30), nullable=False, default="non_payee", server_default=text("'non_payee'"))
+    created_by_id = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
+    updated_by_id = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    proforma = relationship("Proforma", back_populates="factures")
+    demande_team_building = relationship("DemandeTeamBuilding", back_populates="factures")
+    demande_tourisme = relationship("DemandeTourisme", back_populates="factures")
+    demande_tourisme_custom = relationship("DemandeTourismeCustom", back_populates="factures")
+    created_by = relationship("Utilisateur", foreign_keys=[created_by_id])
+    updated_by = relationship("Utilisateur", foreign_keys=[updated_by_id])
+    paiements = relationship("Paiement", back_populates="facture", cascade="all, delete-orphan")
+    depenses = relationship("Depense", back_populates="facture")
+
+    @property
+    def total_paye(self) -> Decimal:
+        return sum(
+            (paiement.montant or Decimal("0") for paiement in self.paiements),
+            Decimal("0"),
+        )
+
+    @property
+    def reste_a_payer(self) -> Decimal:
+        reste = (self.montant_facture or Decimal("0")) - self.total_paye
+        return reste if reste > 0 else Decimal("0")
+
+
+class Paiement(Base):
+    __tablename__ = "paiement"
+    __table_args__ = (
+        CheckConstraint("montant > 0", name="ck_paiement_montant_pos"),
+        CheckConstraint(
+            "mode_paiement IS NULL OR mode_paiement IN ("
+            "'ESPECES',"
+            "'WAVE',"
+            "'ORANGE_MONEY',"
+            "'MTN_MONEY',"
+            "'VIREMENT',"
+            "'CHEQUE',"
+            "'CARTE_BANCAIRE'"
+            ")",
+            name="ck_paiement_mode_paiement",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    facture_id = Column(Integer, ForeignKey("facture.id", ondelete="CASCADE"), nullable=False, index=True)
+    montant = Column(Numeric(14, 2), nullable=False)
+    date_paiement = Column(Date, nullable=False, server_default=func.current_date())
+    mode_paiement = Column(String(50), nullable=True)
+    reference_transaction = Column(String(150), nullable=True)
+    created_by_id = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
+    updated_by_id = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    facture = relationship("Facture", back_populates="paiements")
+    created_by = relationship("Utilisateur", foreign_keys=[created_by_id])
+    updated_by = relationship("Utilisateur", foreign_keys=[updated_by_id])
 
 
 class ActiviteMateriel(Base):
@@ -975,6 +1135,8 @@ class DemandeTourisme(Base):
     created_by = relationship("Utilisateur", foreign_keys=[created_by_id])
     offres = relationship("OffreTourisme", back_populates="demande_tourisme", cascade="all, delete-orphan")
     proformas = relationship("Proforma", back_populates="demande_tourisme")
+    factures = relationship("Facture", back_populates="demande_tourisme")
+    depenses = relationship("Depense", back_populates="demande_tourisme")
 
     @property
     def created_by_nom_complet(self) -> str | None:
@@ -1032,6 +1194,8 @@ class DemandeTourismeCustom(Base):
     updated_by = relationship("Utilisateur", foreign_keys=[updated_by_id])
     offres = relationship("OffreTourisme", back_populates="demande_tourisme_custom", cascade="all, delete-orphan")
     proformas = relationship("Proforma", back_populates="demande_tourisme_custom")
+    factures = relationship("Facture", back_populates="demande_tourisme_custom")
+    depenses = relationship("Depense", back_populates="demande_tourisme_custom")
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 

@@ -90,8 +90,31 @@ def generate_depense_reference(db: Session, created_at: datetime | None = None) 
     return f"{prefix}{highest_rank + 1:03d}"
 
 
-def get_depenses(db: Session, skip: int = 0, limit: int = 100) -> list[Depense]:
-    return db.query(Depense).order_by(Depense.date_depense.desc().nulls_last()).offset(skip).limit(limit).all()
+def get_depenses(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    pole: str | None = None,
+    facture_id: int | None = None,
+    proforma_id: int | None = None,
+    demande_team_building_id: int | None = None,
+    demande_tourisme_id: int | None = None,
+    demande_tourisme_custom_id: int | None = None,
+) -> list[Depense]:
+    query = db.query(Depense)
+    if pole:
+        query = query.filter(Depense.pole == pole)
+    if facture_id is not None:
+        query = query.filter(Depense.facture_id == facture_id)
+    if proforma_id is not None:
+        query = query.filter(Depense.proforma_id == proforma_id)
+    if demande_team_building_id is not None:
+        query = query.filter(Depense.demande_team_building_id == demande_team_building_id)
+    if demande_tourisme_id is not None:
+        query = query.filter(Depense.demande_tourisme_id == demande_tourisme_id)
+    if demande_tourisme_custom_id is not None:
+        query = query.filter(Depense.demande_tourisme_custom_id == demande_tourisme_custom_id)
+    return query.order_by(Depense.date_depense.desc().nulls_last()).offset(skip).limit(limit).all()
 
 
 def get_depenses_by_activite(db: Session, activite_id: int, skip: int = 0, limit: int = 100) -> list[Depense]:
@@ -130,6 +153,7 @@ def get_depenses_by_categorie(db: Session, categorie_id: int, skip: int = 0, lim
 def create_depense(db: Session, payload: DepenseCreate) -> Depense:
     values = _model_dump(payload)
     values.pop("reference", None)
+    values["pole"] = values.get("pole") or "teambuilding"
     values["reference"] = generate_depense_reference(db)
     db_depense = Depense(**values)
     db.add(db_depense)
