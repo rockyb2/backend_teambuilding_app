@@ -144,6 +144,61 @@ def send_notification_email(
     )
 
 
+def _get_crm_login_url() -> str:
+    return (
+        os.getenv("CRM_LOGIN_URL")
+        or os.getenv("FRONTEND_URL")
+        or "http://localhost:5173/login"
+    ).strip()
+
+
+def build_user_access_email(utilisateur, password: str) -> tuple[str, str, str]:
+    full_name = " ".join(
+        value.strip()
+        for value in (getattr(utilisateur, "prenom", None), getattr(utilisateur, "nom", None))
+        if value and value.strip()
+    ) or getattr(utilisateur, "email", "")
+    login_url = _get_crm_login_url()
+    role = getattr(utilisateur, "role", None) or "Utilisateur CRM"
+    rows = [
+        ("Nom", full_name),
+        ("Role", role),
+        ("Email de connexion", getattr(utilisateur, "email", "")),
+        ("Mot de passe", password),
+        ("Lien CRM", login_url),
+        ("Securite", "Modifiez votre mot de passe apres votre premiere connexion."),
+    ]
+    subject = "Vos acces au CRM IvoirTrips"
+    body = (
+        f"Bonjour {full_name},\n\n"
+        "Votre compte CRM IvoirTrips a ete cree.\n\n"
+        + "\n".join(f"{label} : {_normalize_value(value)}" for label, value in rows[1:])
+        + "\n\nPour plus de securite, modifiez votre mot de passe apres votre premiere connexion."
+    )
+    html_body = _render_email_html(
+        title="Vos acces au CRM IvoirTrips",
+        subtitle="Votre compte utilisateur est pret. Vous pouvez vous connecter avec les informations ci-dessous.",
+        badge="Acces CRM",
+        rows=rows,
+        accent="#0f766e",
+    )
+    return subject, body, html_body
+
+
+def send_user_access_email(utilisateur, password: str) -> bool:
+    if not is_email_enabled():
+        return False
+
+    subject, body, html_body = build_user_access_email(utilisateur, password)
+    send_email(
+        subject=subject,
+        body=body,
+        html_body=html_body,
+        to_emails=[getattr(utilisateur, "email", "")],
+    )
+    return True
+
+
 def _normalize_value(value) -> str:
     if value is None:
         return "Non précisé"

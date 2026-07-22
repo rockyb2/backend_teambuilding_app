@@ -66,7 +66,7 @@ def add_message(
 def get_recent_messages(
     db: Session,
     session_id: int,
-    limit: int = 12,
+    limit: int = 20,
 ) -> list[ChatMessage]:
     messages = (
         db.query(ChatMessage)

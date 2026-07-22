@@ -6,16 +6,41 @@ import logging
 import re
 import unicodedata
 from datetime import datetime
-from pathlib import Path
 
 from smolagents import ToolCallingAgent, LiteLLMModel, DuckDuckGoSearchTool
 
-from agentautomatisation.toolss import BuildExcelPro, SendMail
+from agentautomatisation.toolss import SendMail
 
 SALES_EMAIL = os.getenv("SALES_EMAIL", "contact@ivoirtrips.com")
 _sent_email_signatures = set()
-QUOTATION_OUTPUT_DIR = Path(__file__).resolve().parents[1] / "generated_cotations"
 logger = logging.getLogger(__name__)
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+
+CHAT_AGENT_HISTORY_SUMMARY_MAX_CHARS = max(
+    300,
+    _env_int("CHAT_AGENT_HISTORY_SUMMARY_MAX_CHARS", 1200),
+)
+CHAT_AGENT_FALLBACK_MESSAGE = os.getenv(
+    "CHAT_AGENT_FALLBACK_MESSAGE",
+    (
+        "Je rencontre une difficulte technique momentanee. "
+        "Merci de reessayer dans quelques secondes ou d'utiliser le formulaire de contact."
+    ),
+)
+CHAT_AGENT_FALLBACK_MESSAGE_EN = os.getenv(
+    "CHAT_AGENT_FALLBACK_MESSAGE_EN",
+    (
+        "I am experiencing a temporary technical issue. "
+        "Please try again in a few seconds or use the contact form."
+    ),
+)
 
 
 AGENT_INSTRUCTIONS = """
@@ -119,6 +144,7 @@ Contexte CRM/back-office:
   affecter site/jeux/personnel/benevoles/materiel et suivre les depenses.
 - Explique ce workflow simplement si le client demande "que se passe-t-il apres ?".
 
+
 Collecte d'information optimisee:
 - Objectif prioritaire: rendre l'experience fluide, pas transformer le chatbot en formulaire.
 - Recolte seulement les informations indispensables pour permettre a l'equipe de recontacter le client.
@@ -197,8 +223,7 @@ Validation:
 Rapport commercial par email:
 - Quand le client donne une demande exploitable ou remplit le formulaire, ne fais pas
   l'envoi toi-meme: produis le JSON strict attendu.
-- Le backend detecte ce JSON, declenche l'agent cotation, genere le fichier Excel
-  brouillon, puis envoie l'email commercial avec la piece jointe.
+- Le backend detecte ce JSON, puis envoie l'email commercial a l'equipe.
 - Ne genere jamais de fichier Word, PDF ou Excel dans la conversation client.
 - N'attends pas le lieu, le budget, l'objectif, la fonction ou les options logistiques
   pour transmettre.
@@ -259,37 +284,6 @@ Regles de securite:
 """
 
 
-COTATION_AGENT_INSTRUCTIONS = """
-Tu es l'agent cotation interne de IVOIR TRIPS INTERNATIONAL.
-Tu ne parles jamais au client et tu n'envoies jamais d'email.
-Ton seul role est de transformer une demande client qualifiee en cotation Excel
-brouillon pour aider l'equipe commerciale.
-
-Regles:
-- Utilise obligatoirement l'outil BuildExcelPro une seule fois.
-- Utilise exactement le nom de fichier fourni dans le message, sans ajouter .xlsx.
-- Cree une cotation indicative, jamais un devis definitif.
-- N'invente pas de disponibilite, de remise ou de promesse commerciale.
-- Si un poste depend d'une information manquante, mets 0 en prix et indique
-  "A chiffrer" dans les notes.
-- Les montants sont en FCFA.
-- Termine ta reponse par: COTATION_EXCEL_PATH: chemin_du_fichier.xlsx
-
-Colonnes obligatoires:
-["Categorie", "Poste", "Description", "Quantite", "Prix unitaire estimatif", "Total estimatif", "Notes"]
-
-Prix indicatifs autorises pour brouillon interne:
-- Team building: animation 15000 FCFA/personne, conception 300000 FCFA,
-  coordination 500000 FCFA.
-- Evenement entreprise: conception 500000 FCFA, coordination 750000 FCFA,
-  production/logistique a chiffrer si le besoin n'est pas detaille.
-- Tourisme: si le circuit catalogue est connu, utiliser le prix indique dans
-  le resume; sinon mettre 0 et "A chiffrer".
-- Studio Mossika: utiliser les prix visibles dans les consignes de l'agent
-  si le pack est clairement identifiable; sinon mettre 0 et "A chiffrer".
-"""
-
-
 def _create_model():
     return LiteLLMModel(
         model_id="mistral/mistral-large-latest",
@@ -305,15 +299,6 @@ def create_agent():
         tools=[DuckDuckGoSearchTool()],
         max_steps=15,
         instructions=prompt,
-    )
-
-
-def create_cotation_agent():
-    return ToolCallingAgent(
-        model=_create_model(),
-        tools=[BuildExcelPro()],
-        max_steps=6,
-        instructions=COTATION_AGENT_INSTRUCTIONS,
     )
 
 
@@ -606,19 +591,6 @@ def _user_facing_response(raw_output):
     return cleaned
 
 
-def _safe_filename_part(value, fallback: str = "client") -> str:
-    normalized = _normalise_text(value)
-    safe = re.sub(r"[^a-z0-9]+", "_", normalized).strip("_")
-    return safe[:60] or fallback
-
-
-def _first_available(*values):
-    for value in values:
-        if _has_value(value):
-            return value
-    return ""
-
-
 def _split_full_name(value: str) -> tuple[str, str]:
     parts = str(value or "").strip().split()
     if not parts:
@@ -702,6 +674,7 @@ def _extract_natural_fields(text: str) -> dict:
     participants = _extract_regex_group(
         normalized,
         [
+            r"\b(\d{1,6})\s*(?:personnes|participants|voyageurs|invites?)\b",
             r"(?:nombre de participants|participants|personnes|nous sommes|on est|nous serons|on sera)\D{0,25}(\d{1,6})",
         ],
     )
@@ -709,6 +682,7 @@ def _extract_natural_fields(text: str) -> dict:
         normalized,
         [
             r"\b(\d{1,2}\s+(?:janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre)\s+\d{4})\b",
+            r"\b(\d{1,2}\s+(?:janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre))\b",
             r"(?:date|periode)\D{0,25}([0-3]?\d[/-][01]?\d[/-](?:20)?\d{2})",
         ],
     )
@@ -901,261 +875,11 @@ def _extract_positive_int(*values) -> int:
     return 0
 
 
-def _quotation_file_stem(payload: dict) -> Path:
-    client = payload.get("client", {}) or {}
-    demande = payload.get("demande", {}) or {}
-    details = demande.get("details", {}) or {}
-    client_label = _first_available(
-        client.get("entreprise"),
-        f"{client.get('prenom', '')} {client.get('nom', '')}".strip(),
-        client.get("nom"),
-        "client",
-    )
-    request_type = _safe_filename_part(demande.get("type_demande"), "demande")
-    date_label = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    detail_label = _safe_filename_part(
-        details.get("objectif") or demande.get("resume") or request_type,
-        "cotation",
-    )
-    filename = f"cotation_{request_type}_{_safe_filename_part(client_label)}_{detail_label}_{date_label}"
-    QUOTATION_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    return QUOTATION_OUTPUT_DIR / filename
-
-
-def _extract_generated_excel_path(result) -> str | None:
-    text = _output_content(result)
-    candidates: list[str] = []
-    if "||" in text:
-        candidates.extend(piece.strip() for piece in text.split("||")[1:])
-    candidates.extend(
-        match.group(0).strip()
-        for match in re.finditer(
-            r"[A-Za-z]:[/\\][^\n\r\"']+?\.xlsx|(?:\.{0,2}[/\\])?[A-Za-z0-9_./\\ -]+?\.xlsx",
-            text,
-        )
-    )
-
-    for candidate in candidates:
-        cleaned = candidate.strip().strip("'\"")
-        path = Path(cleaned)
-        if path.is_file():
-            return str(path.resolve())
-        if not path.is_absolute():
-            relative_path = Path.cwd() / path
-            if relative_path.is_file():
-                return str(relative_path.resolve())
-    return None
-
-
-def _default_cotation_rows(payload: dict) -> list[list]:
-    client = payload.get("client", {}) or {}
-    demande = payload.get("demande", {}) or {}
-    details = demande.get("details", {}) or {}
-    type_demande = _normalise_text(demande.get("type_demande"))
-    participants = _extract_positive_int(
-        demande.get("nombre_personnes"),
-        details.get("nombre_participants"),
-        details.get("nombre_personnes"),
-        details.get("participants"),
-    )
-    client_label = _first_available(
-        client.get("entreprise"),
-        f"{client.get('prenom', '')} {client.get('nom', '')}".strip(),
-        client.get("nom"),
-        "Client",
-    )
-    request_resume = _first_available(demande.get("resume"), "Demande qualifiee via le chat")
-    rows: list[list] = [
-        ["Dossier", "Client", str(client_label), 1, 0, 0, "Information issue du chat"],
-        ["Dossier", "Resume", str(request_resume), 1, 0, 0, "Base de travail commerciale"],
-        [
-            "Dossier",
-            "Date/periode",
-            str(_first_available(demande.get("date_souhaitee"), details.get("date"), details.get("periode"), "")),
-            1,
-            0,
-            0,
-            "Information issue du chat",
-        ],
-        [
-            "Dossier",
-            "Lieu",
-            str(_first_available(demande.get("lieu_souhaite"), details.get("lieu"), details.get("destination"), "")),
-            1,
-            0,
-            0,
-            "Information issue du chat",
-        ],
-        ["Dossier", "Participants", participants or 0, 1, 0, 0, "Information issue du chat"],
-        [
-            "Dossier",
-            "Budget",
-            str(_first_available(demande.get("budget_estime"), details.get("budget"), "")),
-            1,
-            0,
-            0,
-            "Information issue du chat",
-        ],
-    ]
-
-    if type_demande == "team_building":
-        quantity = participants or 1
-        animation_unit_price = int(os.getenv("TEAM_BUILDING_ANIMATION_UNIT_PRICE", "15000"))
-        design_price = int(os.getenv("TEAM_BUILDING_DESIGN_PRICE", "300000"))
-        coordination_price = int(os.getenv("TEAM_BUILDING_COORDINATION_PRICE", "500000"))
-        rows.extend(
-            [
-                [
-                    "Team building",
-                    "Animation et facilitation",
-                    "Animation des activites de cohesion",
-                    quantity,
-                    animation_unit_price,
-                    quantity * animation_unit_price,
-                    "Prix indicatif par participant, a valider",
-                ],
-                [
-                    "Team building",
-                    "Conception du programme",
-                    "Preparation du deroule et adaptation a l'objectif client",
-                    1,
-                    design_price,
-                    design_price,
-                    "Forfait indicatif",
-                ],
-                [
-                    "Team building",
-                    "Coordination operationnelle",
-                    "Pilotage, coordination equipe et suivi commercial",
-                    1,
-                    coordination_price,
-                    coordination_price,
-                    "Forfait indicatif",
-                ],
-                [
-                    "Logistique",
-                    "Transport / restauration / hebergement",
-                    "A definir selon le lieu, le format et les options retenues",
-                    1,
-                    0,
-                    0,
-                    "A chiffrer",
-                ],
-            ]
-        )
-    elif type_demande in {"tourisme_circuit", "tourisme_personnalise"}:
-        quantity = participants or 1
-        rows.extend(
-            [
-                [
-                    "Tourisme",
-                    "Voyage ou circuit",
-                    str(_first_available(demande.get("lieu_souhaite"), details.get("destination"), "Destination a confirmer")),
-                    quantity,
-                    0,
-                    0,
-                    "A chiffrer selon disponibilites et formule",
-                ],
-                [
-                    "Tourisme",
-                    "Coordination et assistance",
-                    "Preparation du dossier voyage et coordination client",
-                    1,
-                    0,
-                    0,
-                    "A chiffrer",
-                ],
-            ]
-        )
-    elif type_demande == "studio_mossika":
-        rows.extend(
-            [
-                [
-                    "Studio Mossika",
-                    "Production audiovisuelle",
-                    str(_first_available(details.get("type_projet"), demande.get("resume"), "Projet studio a cadrer")),
-                    1,
-                    0,
-                    0,
-                    "A chiffrer selon pack et options",
-                ],
-                [
-                    "Studio Mossika",
-                    "Post-production",
-                    "Montage, exports et livrables",
-                    1,
-                    0,
-                    0,
-                    "A chiffrer",
-                ],
-            ]
-        )
-    else:
-        rows.extend(
-            [
-                [
-                    "Evenement",
-                    "Conception evenementielle",
-                    str(_first_available(details.get("type_evenement"), demande.get("resume"), "Evenement a cadrer")),
-                    1,
-                    500000,
-                    500000,
-                    "Forfait indicatif",
-                ],
-                [
-                    "Evenement",
-                    "Coordination operationnelle",
-                    "Coordination globale et suivi du dossier",
-                    1,
-                    750000,
-                    750000,
-                    "Forfait indicatif",
-                ],
-                [
-                    "Production / Logistique",
-                    "Production technique et logistique",
-                    "A definir selon lieu, format, prestataires et capacite",
-                    1,
-                    0,
-                    0,
-                    "A chiffrer",
-                ],
-            ]
-        )
-
-    total = sum(row[5] for row in rows if isinstance(row[5], (int, float)))
-    rows.append(["TOTAL", "Total estimatif", "Brouillon interne non contractuel", 1, 0, total, "A valider par l'equipe commerciale"])
-    return rows
-
-
-def _build_default_cotation_excel(payload: dict, file_stem: Path) -> str | None:
-    headers = [
-        "Categorie",
-        "Poste",
-        "Description",
-        "Quantite",
-        "Prix unitaire estimatif",
-        "Total estimatif",
-        "Notes",
-    ]
-    result = BuildExcelPro().forward(
-        name=file_stem.as_posix(),
-        headers=headers,
-        rows=_default_cotation_rows(payload),
-    )
-    return _extract_generated_excel_path(result)
-
-
-def _generate_cotation_excel(payload: dict) -> str | None:
-    file_stem = _quotation_file_stem(payload)
-    return _build_default_cotation_excel(payload, file_stem)
-
-
 def _format_email_value(value, fallback: str = "A completer") -> str:
     return str(value).strip() if _has_value(value) else fallback
 
 
-def _format_sales_email_message(user_message: str, payload: dict, cotation_path: str | None) -> str:
+def _format_sales_email_message(user_message: str, payload: dict) -> str:
     client = payload.get("client", {}) or {}
     demande = payload.get("demande", {}) or {}
     details = demande.get("details", {}) or {}
@@ -1197,15 +921,141 @@ def _format_sales_email_message(user_message: str, payload: dict, cotation_path:
         lines.extend(["", "POINTS A COMPLETER"])
         lines.extend(f"- {point}" for point in clean_points)
 
-    lines.extend(
-        [
-            "",
-            "COTATION",
-            f"- Fichier joint: {cotation_path if cotation_path else 'Non genere'}",
-            "- Note: cotation brouillon interne a verifier avant envoi au client.",
-        ]
-    )
     return "\n".join(lines)
+
+
+def _shorten_history_text(text: str, max_chars: int) -> str:
+    compact_text = " ".join(str(text or "").split())
+    if len(compact_text) <= max_chars:
+        return compact_text
+    return compact_text[:max_chars].rstrip() + "..."
+
+
+def _summary_line(label: str, value) -> str:
+    if not _has_value(value):
+        return ""
+    return f"- {label}: {value}"
+
+
+def _compact_session_summary(conversation_history: list[dict] | None = None) -> str:
+    messages = conversation_history or []
+    if not messages:
+        return ""
+
+    user_messages = [
+        str(message.get("content", "")).strip()
+        for message in messages
+        if str(message.get("role", "")).lower() == "user" and message.get("content")
+    ]
+    assistant_messages = [
+        str(message.get("content", "")).strip()
+        for message in messages
+        if str(message.get("role", "")).lower() == "assistant" and message.get("content")
+    ]
+    user_text = "\n".join(user_messages)
+    natural_fields = _extract_natural_fields(user_text)
+    payload = _payload_from_conversation("", messages)
+    client = (payload or {}).get("client", {}) or {}
+    demande = (payload or {}).get("demande", {}) or {}
+    request_type = demande.get("type_demande") or _detect_type_from_text(user_text)
+
+    client_name = " ".join(
+        part
+        for part in [client.get("prenom"), client.get("nom")]
+        if _has_value(part)
+    ).strip()
+    lines = [
+        "Resume compact de la session precedente:",
+        _summary_line("type de demande", request_type),
+        _summary_line("client", client_name),
+        _summary_line("entreprise", client.get("entreprise") or natural_fields.get("entreprise")),
+        _summary_line("email", client.get("email") or natural_fields.get("email")),
+        _summary_line("telephone", client.get("telephone") or natural_fields.get("telephone")),
+        _summary_line("date/periode", demande.get("date_souhaitee") or natural_fields.get("date")),
+        _summary_line(
+            "nombre de personnes",
+            demande.get("nombre_personnes") or natural_fields.get("participants"),
+        ),
+        _summary_line("lieu/destination", demande.get("lieu_souhaite") or natural_fields.get("lieu")),
+        _summary_line("budget", demande.get("budget_estime") or natural_fields.get("budget")),
+    ]
+
+    recent_client_messages = [
+        _shorten_history_text(message, 180)
+        for message in user_messages[-3:]
+        if message
+    ]
+    if recent_client_messages:
+        lines.append("- derniers messages client: " + " | ".join(recent_client_messages))
+
+    if assistant_messages:
+        cleaned_assistant, payload = _remove_structured_payload_from_text(assistant_messages[-1])
+        if not cleaned_assistant and payload:
+            resume = (payload.get("demande", {}) or {}).get("resume")
+            cleaned_assistant = f"Demande deja capturee: {resume}" if _has_value(resume) else ""
+        if cleaned_assistant:
+            lines.append(
+                "- derniere reponse assistant: "
+                + _shorten_history_text(cleaned_assistant, 240)
+            )
+
+    summary = "\n".join(line for line in lines if line)
+    return _shorten_history_text(summary, CHAT_AGENT_HISTORY_SUMMARY_MAX_CHARS)
+
+
+def _should_reply_in_english(message_user: str, locale: str | None = None) -> bool:
+    locale_code = str(locale or "").strip().lower()
+    if locale_code.startswith("en"):
+        return True
+
+    text = f" {str(message_user or '').strip().lower()} "
+    if not text.strip():
+        return False
+
+    strong_phrases = [
+        "speak english",
+        "tour guide",
+        "tour guides",
+        "do you",
+        "does any",
+        "can you",
+        "how can",
+        "what are",
+        "i want",
+        "i would",
+    ]
+    if any(phrase in text for phrase in strong_phrases):
+        return True
+
+    english_markers = [
+        r"\bhello\b",
+        r"\bhi\b",
+        r"\bplease\b",
+        r"\bthanks?\b",
+        r"\benglish\b",
+        r"\btour\b",
+        r"\bguides?\b",
+        r"\bspeak\b",
+        r"\bbook\b",
+        r"\breserve\b",
+        r"\btravel\b",
+    ]
+    return sum(1 for marker in english_markers if re.search(marker, text)) >= 2
+
+
+def _language_instruction(message_user: str, locale: str | None = None) -> str:
+    if not _should_reply_in_english(message_user, locale):
+        return ""
+    return (
+        "The client's latest message is in English. "
+        "Reply only in English unless the client switches language."
+    )
+
+
+def _fallback_message_for_user(message_user: str, locale: str | None = None) -> str:
+    if _should_reply_in_english(message_user, locale):
+        return CHAT_AGENT_FALLBACK_MESSAGE_EN
+    return CHAT_AGENT_FALLBACK_MESSAGE
 
 
 def _notify_sales_team_if_needed(
@@ -1230,15 +1080,13 @@ def _notify_sales_team_if_needed(
     client = payload.get("client", {}) or {}
     client_name = client.get("nom") or client.get("entreprise") or "Client"
     subject = f"[NOUVELLE DEMANDE] IvoirTrips - {client_name}"
-    cotation_path = _generate_cotation_excel(payload)
-    message = _format_sales_email_message(user_message, payload, cotation_path)
+    message = _format_sales_email_message(user_message, payload)
 
     send_result = SendMail().forward(
         recipient_email=SALES_EMAIL,
         subject=subject,
         message=message,
         is_html=False,
-        attachment_path=cotation_path,
     )
 
     if isinstance(send_result, str) and not send_result.lower().startswith("erreur"):
@@ -1248,32 +1096,24 @@ def _notify_sales_team_if_needed(
 def _build_contextual_message(
     message_user: str,
     conversation_history: list[dict] | None = None,
+    locale: str | None = None,
 ) -> str:
+    language_instruction = _language_instruction(message_user, locale)
     if not conversation_history:
+        if language_instruction:
+            return "\n\n".join([language_instruction, "Nouveau message du client:", message_user])
         return message_user
 
-    lines = [
-        "Tu dois continuer la conversation ci-dessous sans repartir de zero.",
-        "Ne redemande pas une information deja donnee dans l'historique.",
-        "",
-        "Historique de la session:",
-    ]
+    lines = []
+    if language_instruction:
+        lines.extend([language_instruction, ""])
 
-    role_labels = {
-        "user": "Client",
-        "assistant": "Assistant",
-        "system": "Systeme",
-    }
-    for message in conversation_history:
-        role = role_labels.get(str(message.get("role", "")).lower(), "Message")
-        content = str(message.get("content", "")).strip()
-        if str(message.get("role", "")).lower() == "assistant":
-            content, payload = _remove_structured_payload_from_text(content)
-            if not content and payload:
-                resume = (payload.get("demande", {}) or {}).get("resume")
-                content = f"Demande deja capturee: {resume}" if _has_value(resume) else ""
-        if content:
-            lines.append(f"{role}: {content}")
+    lines.extend([
+        "Tu dois continuer la conversation ci-dessous sans repartir de zero.",
+        "Ne redemande pas une information deja donnee dans le resume.",
+        "",
+        _compact_session_summary(conversation_history),
+    ])
 
     lines.extend(["", "Nouveau message du client:", message_user])
     return "\n".join(lines)
@@ -1282,8 +1122,14 @@ def _build_contextual_message(
 def chat_with_agent(
     message_user: str,
     conversation_history: list[dict] | None = None,
+    locale: str | None = None,
 ) -> str | dict:
-    contextual_message = _build_contextual_message(message_user, conversation_history)
-    output = create_agent().run(contextual_message)
+    contextual_message = _build_contextual_message(message_user, conversation_history, locale)
+    try:
+        output = create_agent().run(contextual_message)
+    except Exception:
+        logger.exception("Erreur pendant l'appel de l'agent chatbot")
+        return _fallback_message_for_user(message_user, locale)
+
     _notify_sales_team_if_needed(message_user, output, conversation_history)
     return _user_facing_response(output)

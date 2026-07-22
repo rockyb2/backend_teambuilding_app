@@ -16,3 +16,7 @@ num2words
 openpyxl
 litellm
 deepl
+langfuse
+openinference-instrumentation-smolagents
+opentelemetry-sdk
+opentelemetry-exporter-otlp

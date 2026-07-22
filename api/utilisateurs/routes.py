@@ -36,8 +36,18 @@ from security import (
     require_role_management_access,
     require_user_management_access,
 )
+from services.email_service import send_user_access_email
 
 router = APIRouter(prefix="/api/utilisateurs", tags=["utilisateurs"])
+
+
+def _send_access_email_safely(utilisateur, plain_password: str) -> None:
+    try:
+        sent = send_user_access_email(utilisateur, plain_password)
+        if not sent:
+            print(f"SMTP desactive: acces CRM non envoyes a {utilisateur.email}")
+    except Exception as exc:
+        print(f"Echec envoi acces CRM utilisateur {utilisateur.id_utilisateur}: {exc}")
 
 
 def _auth_user_response(utilisateur):
@@ -157,9 +167,12 @@ def create_utilisateur(
         raise HTTPException(status_code=403, detail="Vous ne pouvez pas attribuer ce role")
 
     try:
-        return crud_utilisateur.create_utilisateur(db, payload)
+        db_utilisateur = crud_utilisateur.create_utilisateur(db, payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+    _send_access_email_safely(db_utilisateur, payload.mot_de_passe)
+    return db_utilisateur
 
 
 @router.put("/{utilisateur_id}", response_model=UtilisateurRead)

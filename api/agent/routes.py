@@ -9,6 +9,10 @@ from sqlalchemy.orm import Session
 from agentautomatisation.agentcore import chat_with_agent
 from api.dependencies import get_db
 from crud import chat as crud_chat
+from observability.langfuse_setup import (
+    chatbot_trace_context,
+    update_chatbot_trace_output,
+)
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 
@@ -71,12 +75,21 @@ def chat_with_agent_endpoint(request: ChatRequest, db: Session = Depends(get_db)
         metadata={"locale": request.locale} if request.locale else None,
     )
 
-    response = _normalize_response(
-        chat_with_agent(
-            request.message,
-            conversation_history=_history_payload(previous_messages),
+    with chatbot_trace_context(
+        session_id=token,
+        user_message=request.message,
+        locale=request.locale,
+        history_message_count=len(previous_messages),
+    ) as trace:
+        response = _normalize_response(
+            chat_with_agent(
+                request.message,
+                conversation_history=_history_payload(previous_messages),
+                locale=request.locale,
+            )
         )
-    )
+        update_chatbot_trace_output(trace, response)
+
     crud_chat.add_message(
         db,
         session_id=chat_session.id,

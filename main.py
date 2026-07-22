@@ -9,6 +9,10 @@ from core.env_loader import load_local_env
 
 load_local_env()
 
+from observability.langfuse_setup import flush_langfuse, setup_langfuse
+
+setup_langfuse()
+
 from api import include_api_routes
 from database import models, schemas
 from database.connection import create_tables
@@ -77,3 +81,9 @@ def read_root():
 def health_check():
     """Verifier l'etat de l'API."""
     return {"status": "ok"}
+
+
+@app.on_event("shutdown")
+def shutdown_observability():
+    """Envoyer les traces Langfuse restantes avant l'arret."""
+    flush_langfuse()
