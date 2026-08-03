@@ -12,6 +12,7 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
 from reportlab.platypus import (
     Image,
     Paragraph,
@@ -25,6 +26,7 @@ from reportlab.platypus import (
 BASE_DIR = Path(__file__).resolve().parents[1]
 ASSETS_DIR = BASE_DIR / "assets" / "proforma"
 DEFAULT_OUTPUT_DIR = BASE_DIR / "uploads" / "proformas"
+SIGNATURE_BACKGROUND_MASK = [245, 255, 245, 255, 245, 255]
 
 
 def _decimal(value: Any, field_name: str = "montant") -> Decimal:
@@ -76,8 +78,20 @@ def _format_fcfa(value: Any) -> str:
     return f"{amount:,}".replace(",", " ") + " F CFA"
 
 
+def _format_amount_words_fcfa(value: Any) -> str:
+    amount = int(_decimal(value))
+    words = num2words(amount, lang="fr").strip()
+    if words:
+        words = words[0].upper() + words[1:]
+    return f"{words} FCFA"
+
+
 def _paragraph(text: Any, style: ParagraphStyle) -> Paragraph:
     return Paragraph(escape(str(text or "")), style)
+
+
+def _markup_paragraph(markup: str, style: ParagraphStyle) -> Paragraph:
+    return Paragraph(markup, style)
 
 
 def _safe_pdf_path(reference: str, output_dir: str | Path | None = None) -> Path:
@@ -89,6 +103,22 @@ def _safe_pdf_path(reference: str, output_dir: str | Path | None = None) -> Path
     directory = Path(output_dir) if output_dir else DEFAULT_OUTPUT_DIR
     directory.mkdir(parents=True, exist_ok=True)
     return (directory / f"{clean_reference}.pdf").resolve()
+
+
+def _first_existing_asset(*filenames: str) -> Path | None:
+    for filename in filenames:
+        path = ASSETS_DIR / filename
+        if path.exists():
+            return path
+    return None
+
+
+def _image_dimensions(path: Path, max_width: float, max_height: float) -> tuple[float, float]:
+    image_width, image_height = ImageReader(str(path)).getSize()
+    if not image_width or not image_height:
+        return max_width, max_height
+    scale = min(max_width / image_width, max_height / image_height)
+    return image_width * scale, image_height * scale
 
 
 def _display_date(value: Any) -> str:
@@ -111,55 +141,70 @@ def _styles() -> dict[str, ParagraphStyle]:
             "NormalProforma",
             parent=sample["Normal"],
             fontName="Helvetica",
-            fontSize=7.5,
-            leading=9,
+            fontSize=8.4,
+            leading=10.2,
             alignment=TA_LEFT,
         ),
         "small": ParagraphStyle(
             "SmallProforma",
             parent=sample["Normal"],
             fontName="Helvetica",
-            fontSize=6.7,
-            leading=8,
+            fontSize=7.4,
+            leading=8.8,
+        ),
+        "small_italic": ParagraphStyle(
+            "SmallItalicProforma",
+            parent=sample["Normal"],
+            fontName="Helvetica-Oblique",
+            fontSize=7.8,
+            leading=12.8,
         ),
         "center": ParagraphStyle(
             "CenterProforma",
             parent=sample["Normal"],
             fontName="Helvetica",
-            fontSize=8,
-            leading=10,
+            fontSize=9,
+            leading=11,
             alignment=TA_CENTER,
         ),
         "title": ParagraphStyle(
             "TitleProforma",
             parent=sample["Normal"],
             fontName="Helvetica-Bold",
-            fontSize=10,
-            leading=12,
+            fontSize=11,
+            leading=13,
             alignment=TA_CENTER,
         ),
         "section": ParagraphStyle(
             "SectionProforma",
             parent=sample["Normal"],
             fontName="Helvetica-Bold",
-            fontSize=7.5,
-            leading=9,
+            fontSize=8.3,
+            leading=10,
             leftIndent=5,
         ),
         "right": ParagraphStyle(
             "RightProforma",
             parent=sample["Normal"],
             fontName="Helvetica",
-            fontSize=7.5,
-            leading=9,
+            fontSize=8.2,
+            leading=10,
+            alignment=TA_RIGHT,
+        ),
+        "right_bold": ParagraphStyle(
+            "RightBoldProforma",
+            parent=sample["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=8.4,
+            leading=12.8,
             alignment=TA_RIGHT,
         ),
         "bold": ParagraphStyle(
             "BoldProforma",
             parent=sample["Normal"],
             fontName="Helvetica-Bold",
-            fontSize=7.5,
-            leading=9,
+            fontSize=8.3,
+            leading=10,
         ),
     }
 
@@ -192,32 +237,30 @@ def _draw_page(canvas: Any, document: Any) -> None:
             mask="auto",
         )
 
-    canvas.setFont("Helvetica", 6.7)
-    company_lines = [
-        "Adresse : Cocody Palmeraie, Abidjan",
-        "NCC : 2148693 F / RCC CI-ABJ-03-2021-B13-02976",
-        "Tel : +225 07 79 181 778 / 05 95 298 183",
-        "teambuilding@ivoirtrips.com / voyage@ivoirtrips.com",
-    ]
-    line_y = height - 39 * mm
-    for line in company_lines:
-        canvas.drawString(17 * mm, line_y, line)
-        line_y -= 4 * mm
+    canvas.setFont("Helvetica", 6.8)
+    canvas.drawCentredString(
+        width / 2,
+        15 * mm,
+        "Sarl au capital de 1.000.000 FCFA - Siège social : Cocody Angré 7è tranche - 06 BP 914 ABIDJAN 06 RCC CI-ABJ-03-2021-",
+    )
+    canvas.setFont("Helvetica", 6.8)
+    canvas.drawCentredString(
+        width / 2,
+        11 * mm,
+        "B13-02976 / NCC : 2148693 F",
+    )
+    email_line = "teambuilding@ivoirtrips.com / voyage@ivoirtrips.com"
+    phone_line = " Tel : 07 79 181 778 / 05 95 298 183"
+    email_width = canvas.stringWidth(email_line, "Helvetica", 6.8)
+    phone_width = canvas.stringWidth(phone_line, "Helvetica", 6.8)
+    footer_start_x = (width - email_width - phone_width) / 2
+    footer_y = 7 * mm
 
-    canvas.setFont("Helvetica", 6.4)
-    canvas.drawCentredString(
-        width / 2,
-        16 * mm,
-        "Sarl au capital de 1.000.000 FCFA - Siege social : Cocody Palmeraie - 06 BP 914 ABIDJAN 06",
-    )
-    canvas.setFont("Helvetica-Oblique", 6)
-    canvas.drawCentredString(
-        width / 2,
-        12 * mm,
-        "Centre des impots : Cocody deux plateaux 3 / Regime d'imposition : RSI",
-    )
-    canvas.setFont("Helvetica", 5.5)
-    canvas.drawRightString(width - 15 * mm, 8 * mm, f"Page {document.page}")
+    canvas.setFillColor(colors.HexColor("#1F5FBF"))
+    canvas.setFont("Helvetica", 6.8)
+    canvas.drawString(footer_start_x, footer_y, email_line)
+    canvas.setFillColor(colors.black)
+    canvas.drawString(footer_start_x + email_width, footer_y, phone_line)
     canvas.restoreState()
 
 
@@ -341,43 +384,56 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
         pagesize=A4,
         leftMargin=17 * mm,
         rightMargin=17 * mm,
-        topMargin=52 * mm,
+        topMargin=38 * mm,
         bottomMargin=22 * mm,
         title=f"Facture proforma {reference}",
         author="Ivoir Trips International",
     )
     story: list[Any] = []
 
-    story.append(_paragraph("FACTURE PROFORMA", styles["title"]))
-    story.append(_paragraph(f"N° {reference}", styles["center"]))
-    story.append(Spacer(1, 4 * mm))
-
-    client_info = Table(
-        [
-            [_paragraph("Client :", styles["normal"]), _paragraph(data["client"], styles["bold"])],
-            [
-                _paragraph("Nombre :", styles["normal"]),
-                _paragraph(f"{data['nombre_personnes']} personnes", styles["normal"]),
-            ],
-            [_paragraph("Date :", styles["normal"]), _paragraph(_display_date(data["date_proforma"]), styles["normal"])],
-        ],
-        colWidths=[21 * mm, 55 * mm],
-        hAlign="RIGHT",
+    story.append(
+        _markup_paragraph(
+            f"PROFORMA&nbsp;&nbsp;N°<b>{escape(reference)}</b>",
+            styles["center"],
+        )
     )
-    client_info.setStyle(
+    story.append(Spacer(1, 6 * mm))
+
+    header_info = Table(
+        [
+            [
+                [
+                    _markup_paragraph("<i>Centre des impôts : Cocody deux plateaux 3</i>", styles["small_italic"]),
+                    Spacer(1, 4 * mm),
+                    _markup_paragraph("<i>Régime d'imposition : RSI</i>", styles["small_italic"]),
+                ],
+                [
+                    _markup_paragraph(f"CLIENT : <b>{escape(str(data['client']))}</b>", styles["right_bold"]),
+                    Spacer(1, 4 * mm),
+                    _markup_paragraph(
+                        f"DATE : <b>{escape(_display_date(data['date_proforma']))}</b>",
+                        styles["right"],
+                    ),
+                ],
+            ],
+        ],
+        colWidths=[99 * mm, 77 * mm],
+        hAlign="CENTER",
+    )
+    header_info.setStyle(
         TableStyle(
             [
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 0),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-                ("TOPPADDING", (0, 0), (-1, -1), 1),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
             ]
         )
     )
-    story.append(client_info)
-    story.append(Spacer(1, 5 * mm))
-    story.append(_paragraph(str(data["objet"]).upper(), styles["title"]))
+    story.append(header_info)
+    story.append(Spacer(1, 6 * mm))
+    story.append(_markup_paragraph(f"<u>{escape(str(data['objet']).upper())}</u>", styles["title"]))
     story.append(Spacer(1, 5 * mm))
 
     rows: list[list[Any]] = [
@@ -513,26 +569,55 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
     story.append(services_table)
     story.append(Spacer(1, 5 * mm))
 
-    amount_in_words = num2words(int(totals["total_ttc"]), lang="fr").replace("-", " ")
-    story.append(
-        _paragraph(
-            f"Arreter cette presente PROFORMA a la somme de : {amount_in_words} francs CFA",
-            styles["normal"],
+    signature_path = _first_existing_asset("signature1.png", "signature.png")
+    signature: Image | Spacer
+    if signature_path:
+        signature_width, signature_height = _image_dimensions(
+            signature_path,
+            max_width=70 * mm,
+            max_height=30 * mm,
         )
-    )
-    story.append(Spacer(1, 4 * mm))
-    story.append(
-        _paragraph(
-            f"Modalite de paiement : {data.get('modalite_paiement') or '100% a la commande par cheque'}",
-            styles["normal"],
+        signature = Image(
+            str(signature_path),
+            width=signature_width,
+            height=signature_height,
+            mask=SIGNATURE_BACKGROUND_MASK,
         )
-    )
-
-    signature_path = ASSETS_DIR / "signature.png"
-    if signature_path.exists():
-        signature = Image(str(signature_path), width=34 * mm, height=22 * mm)
         signature.hAlign = "RIGHT"
-        story.append(signature)
+    else:
+        signature = Spacer(70 * mm, 30 * mm)
+
+    amount_in_words = _format_amount_words_fcfa(totals["total_ttc"])
+    validation_block = [
+        _markup_paragraph(
+            "Arrêter cette présente Proforma à la somme de : "
+            f"<font backColor=\"yellow\"><b>{escape(amount_in_words)}</b></font>",
+            styles["normal"],
+        ),
+        Spacer(1, 6 * mm),
+        _markup_paragraph(
+            "Pour validation de la commande, merci de retourner soit la présente Proforma "
+            "signée avec la mention<br/><b>« Bon pour Accord »</b>, soit votre Bon de Commande (BC).",
+            styles["normal"],
+        ),
+    ]
+    signature_table = Table(
+        [[validation_block, signature]],
+        colWidths=[104 * mm, 72 * mm],
+        hAlign="CENTER",
+    )
+    signature_table.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
+    story.append(signature_table)
 
     document.build(story, onFirstPage=_draw_page, onLaterPages=_draw_page)
     return str(output_path)
