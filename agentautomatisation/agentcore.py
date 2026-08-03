@@ -1093,6 +1093,79 @@ def _notify_sales_team_if_needed(
         _sent_email_signatures.add(signature)
 
 
+def _quick_intent_response(message_user: str, locale: str | None = None) -> dict | None:
+    normalized = _normalise_text(message_user)
+    if not normalized:
+        return None
+
+    english = _should_reply_in_english(message_user, locale)
+
+    if any(term in normalized for term in ["i have a question", "j'ai une question", "jai une question"]):
+        return {
+            "content": (
+                "Of course. What would you like to know?"
+                if english
+                else "Bien sûr. Quelle est votre question ?"
+            )
+        }
+
+    if "team building" in normalized or "teambuilding" in normalized or "team-building" in normalized:
+        return {
+            "content": (
+                "Perfect. Let us start simply: which company or organization is this team building for?"
+                if english
+                else "Parfait. On commence simplement : c'est pour quelle entreprise ou organisation ?"
+            )
+        }
+
+    if any(term in normalized for term in ["tourism", "travel request", "tourisme", "voyage"]):
+        return {
+            "content": (
+                "Great. Do you already have a destination or travel idea in mind?"
+                if english
+                else "Super. Vous avez déjà une destination ou une envie de voyage en tête ?"
+            )
+        }
+
+    if "akan" in normalized or "brunch" in normalized or "ticket" in normalized or "billet" in normalized:
+        return {
+            "content": (
+                "Great. Is it for tickets, partnership, private booking or sponsoring?"
+                if english
+                else "Très bien. C'est pour des billets, un partenariat, une privatisation ou du sponsoring ?"
+            )
+        }
+
+    if any(term in normalized for term in ["organize an event", "plan an event", "organiser un evenement", "evenement"]):
+        return {
+            "content": (
+                "Perfect. What type of event would you like to organize?"
+                if english
+                else "Parfait. Quel type d'événement souhaitez-vous organiser ?"
+            )
+        }
+
+    if any(term in normalized for term in ["studio mossika", "podcast", "video", "creative project"]):
+        return {
+            "content": (
+                "Perfect. What type of creative project do you have in mind: video, podcast, event coverage or brand content?"
+                if english
+                else "Parfait. Quel type de projet avez-vous en tête : vidéo, podcast, captation événementielle ou brand content ?"
+            )
+        }
+
+    if any(term in normalized for term in ["another request", "other request", "autre demande"]):
+        return {
+            "content": (
+                "Of course. Tell me what you need and I will guide you."
+                if english
+                else "Bien sûr. Dites-moi ce dont vous avez besoin et je vous guide."
+            )
+        }
+
+    return None
+
+
 def _build_contextual_message(
     message_user: str,
     conversation_history: list[dict] | None = None,
@@ -1124,6 +1197,16 @@ def chat_with_agent(
     conversation_history: list[dict] | None = None,
     locale: str | None = None,
 ) -> str | dict:
+    form_payload = _payload_from_conversation(message_user, conversation_history)
+    if form_payload:
+        _append_missing_points(form_payload)
+        _notify_sales_team_if_needed(message_user, form_payload, conversation_history)
+        return _user_facing_response(form_payload)
+
+    quick_response = _quick_intent_response(message_user, locale)
+    if quick_response:
+        return quick_response
+
     contextual_message = _build_contextual_message(message_user, conversation_history, locale)
     try:
         output = create_agent().run(contextual_message)
