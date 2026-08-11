@@ -30,7 +30,7 @@ def get_categorie_depense(categorie_id: int, db: Session = Depends(get_db)):
     """Recuperer une categorie de depense."""
     db_categorie = crud_depense.get_categorie_depense(db, categorie_id)
     if not db_categorie:
-        raise HTTPException(status_code=404, detail="Categorie de depense non trouvee")
+        raise HTTPException(status_code=404, detail="Catégorie de dépense non trouvée")
     return db_categorie
 
 
@@ -39,7 +39,7 @@ def create_categorie_depense(payload: CategorieDepenseCreate, db: Session = Depe
     """Creer une categorie de depense."""
     existing = crud_depense.get_categorie_depense_by_nom(db, payload.nom)
     if existing:
-        raise HTTPException(status_code=409, detail="Categorie de depense deja existante")
+        raise HTTPException(status_code=409, detail="Catégorie de dépense déjà existante")
 
     return crud_depense.create_categorie_depense(db, payload)
 
@@ -49,13 +49,13 @@ def update_categorie_depense(categorie_id: int, payload: CategorieDepenseUpdate,
     """Mettre a jour une categorie de depense."""
     db_categorie = crud_depense.get_categorie_depense(db, categorie_id)
     if not db_categorie:
-        raise HTTPException(status_code=404, detail="Categorie de depense non trouvee")
+        raise HTTPException(status_code=404, detail="Catégorie de dépense non trouvée")
 
     updates = payload.model_dump(exclude_unset=True) if hasattr(payload, "model_dump") else payload.dict(exclude_unset=True)
     if "nom" in updates and updates["nom"] and updates["nom"] != db_categorie.nom:
         existing = crud_depense.get_categorie_depense_by_nom(db, updates["nom"])
         if existing:
-            raise HTTPException(status_code=409, detail="Categorie de depense deja existante")
+            raise HTTPException(status_code=409, detail="Catégorie de dépense déjà existante")
 
     return crud_depense.update_categorie_depense(db, db_categorie, payload)
 
@@ -65,6 +65,6 @@ def delete_categorie_depense(categorie_id: int, db: Session = Depends(get_db)):
     """Supprimer une categorie de depense."""
     db_categorie = crud_depense.get_categorie_depense(db, categorie_id)
     if not db_categorie:
-        raise HTTPException(status_code=404, detail="Categorie de depense non trouvee")
+        raise HTTPException(status_code=404, detail="Catégorie de dépense non trouvée")
 
     crud_depense.delete_categorie_depense(db, db_categorie)

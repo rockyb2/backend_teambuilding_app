@@ -41,7 +41,7 @@ def get_offres_by_demande(
     """Recuperer les offres d'une demande team building."""
     demande = crud_demande_team_building.get_demande_team_building(db, demande_id)
     if not demande:
-        raise HTTPException(status_code=404, detail="Demande non trouvee")
+        raise HTTPException(status_code=404, detail="Demande non trouvée")
 
     return crud_offre.get_offres_by_demande(db, demande_id, skip=skip, limit=limit)
 
@@ -51,7 +51,7 @@ def get_offre(offre_id: int, db: Session = Depends(get_db)):
     """Recuperer une offre par ID."""
     db_offre = crud_offre.get_offre(db, offre_id)
     if not db_offre:
-        raise HTTPException(status_code=404, detail="Offre non trouvee")
+        raise HTTPException(status_code=404, detail="Offre non trouvée")
     return db_offre
 
 
@@ -64,7 +64,7 @@ def create_offre(
     """Creer une nouvelle offre."""
     demande = crud_demande_team_building.get_demande_team_building(db, payload.demande_id)
     if not demande:
-        raise HTTPException(status_code=404, detail="Demande non trouvee")
+        raise HTTPException(status_code=404, detail="Demande non trouvée")
 
     return crud_offre.create_offre(
         db,
@@ -83,13 +83,13 @@ def update_offre(
     """Mettre a jour une offre."""
     db_offre = crud_offre.get_offre(db, offre_id)
     if not db_offre:
-        raise HTTPException(status_code=404, detail="Offre non trouvee")
+        raise HTTPException(status_code=404, detail="Offre non trouvée")
 
     updates = _payload_dump(payload, exclude_unset=True)
     if "demande_id" in updates and updates["demande_id"] is not None:
         demande = crud_demande_team_building.get_demande_team_building(db, updates["demande_id"])
         if not demande:
-            raise HTTPException(status_code=404, detail="Demande non trouvee")
+            raise HTTPException(status_code=404, detail="Demande non trouvée")
 
     return crud_offre.update_offre(
         db,
@@ -104,6 +104,6 @@ def delete_offre(offre_id: int, db: Session = Depends(get_db)):
     """Supprimer une offre."""
     db_offre = crud_offre.get_offre(db, offre_id)
     if not db_offre:
-        raise HTTPException(status_code=404, detail="Offre non trouvee")
+        raise HTTPException(status_code=404, detail="Offre non trouvée")
 
     crud_offre.delete_offre(db, db_offre)

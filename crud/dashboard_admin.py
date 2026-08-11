@@ -21,25 +21,25 @@ from database.models import (
 LOW_STOCK_THRESHOLD = 5
 MONTH_LABELS = {
     1: "Jan.",
-    2: "Fev.",
+    2: "Fév.",
     3: "Mars",
     4: "Avr.",
     5: "Mai",
     6: "Juin",
     7: "Juil.",
-    8: "Aout",
+    8: "Août",
     9: "Sept.",
     10: "Oct.",
     11: "Nov.",
-    12: "Dec.",
+    12: "Déc.",
 }
 OFFER_STATUS_LABELS = {
     "brouillon": "Brouillons",
-    "envoyee": "Envoyees",
-    "validee": "Validees",
-    "refusee": "Refusees",
-    "expiree": "Expirees",
-    "annulee": "Annulees",
+    "envoyee": "Envoyées",
+    "validee": "Validées",
+    "refusee": "Refusées",
+    "expiree": "Expirées",
+    "annulee": "Annulées",
 }
 SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
@@ -133,7 +133,7 @@ def _role_distribution(db: Session) -> list[dict]:
     return [
         {
             "role": role or "sans_role",
-            "label": (role or "Sans role").replace("_", " ").title(),
+            "label": (role or "Sans rôle").replace("_", " ").title(),
             "count": int(count or 0),
         }
         for role, count in rows
@@ -253,7 +253,7 @@ def _requests_distribution(db: Session) -> list[dict]:
     values = [
         ("Team building", db.query(DemandeTeamBuilding).count()),
         ("Tourisme circuits", db.query(DemandeTourisme).count()),
-        ("Tourisme personnalise", db.query(DemandeTourismeCustom).count()),
+        ("Tourisme personnalisé", db.query(DemandeTourismeCustom).count()),
         ("Contacts site", db.query(DemandeContact).count()),
     ]
     return [{"label": label, "value": int(value or 0)} for label, value in values]
@@ -274,7 +274,7 @@ def _build_alerts(db: Session, today: date) -> list[dict]:
                 "id": f"contact-{item.id}",
                 "type": "contact",
                 "severity": "high",
-                "title": "Contact site non traite",
+                "title": "Contact site non traité",
                 "detail": f"{item.nom_complet} - {item.type_demande}",
                 "route": "/admin/demandes",
             }
@@ -292,7 +292,7 @@ def _build_alerts(db: Session, today: date) -> list[dict]:
                 "id": f"tb-{item.id}",
                 "type": "demande",
                 "severity": "high",
-                "title": "Demande team building a traiter",
+                "title": "Demande team building à traiter",
                 "detail": f"{item.entreprise} - {item.nombre_participants} participant(s)",
                 "route": "/teambuilding/demandes",
             }
@@ -310,7 +310,7 @@ def _build_alerts(db: Session, today: date) -> list[dict]:
                 "id": f"tourisme-{item.id}",
                 "type": "demande",
                 "severity": "high",
-                "title": "Demande tourisme circuit a traiter",
+                "title": "Demande de circuit touristique à traiter",
                 "detail": f"{item.prenom} {item.nom} - {item.titre_circuit}",
                 "route": "/tourisme/demandes-circuits",
             }
@@ -335,7 +335,7 @@ def _build_alerts(db: Session, today: date) -> list[dict]:
                 "type": "offre",
                 "severity": "medium",
                 "title": "Offre team building sans retour",
-                "detail": f"{offer.reference or offer.titre} - envoyee depuis 7 jours",
+                "detail": f"{offer.reference or offer.titre} - envoyée depuis 7 jours",
                 "route": "/teambuilding/offres",
             }
         )
@@ -360,8 +360,8 @@ def _build_alerts(db: Session, today: date) -> list[dict]:
                 "id": f"stock-{material.id}",
                 "type": "stock",
                 "severity": "high" if material.quantite_disponible == 0 else "medium",
-                "title": "Stock production a surveiller",
-                "detail": f"{label} - {int(material.quantite_disponible or 0)} unite(s)",
+                "title": "Stock production à surveiller",
+                "detail": f"{label} - {int(material.quantite_disponible or 0)} unité(s)",
                 "route": "/production/materiel",
             }
         )
@@ -421,7 +421,7 @@ def _recent_activity(db: Session) -> list[dict]:
                 "module": "Team building",
                 "type": "Offre",
                 "client": item.titre,
-                "details": item.reference or "Sans reference",
+                "details": item.reference or "Sans référence",
                 "date": item.created_at,
                 "status": item.statut,
             }

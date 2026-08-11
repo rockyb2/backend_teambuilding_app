@@ -192,12 +192,12 @@ def _tourism_creation_metrics(db: Session, utilisateur_id: int) -> list[dict]:
     return [
         _creation_metric(
             "demandes_circuits",
-            "Demandes de circuits creees",
+            "Demandes de circuits créées",
             _count_rows(db, DemandeTourisme, DemandeTourisme.created_by_id == utilisateur_id),
         ),
         _creation_metric(
             "demandes_personnalisees",
-            "Demandes personnalisees creees",
+            "Demandes personnalisées créées",
             _count_rows(
                 db,
                 DemandeTourismeCustom,
@@ -206,7 +206,7 @@ def _tourism_creation_metrics(db: Session, utilisateur_id: int) -> list[dict]:
         ),
         _creation_metric(
             "circuits",
-            "Circuits / offres touristiques crees",
+            "Circuits / offres touristiques créés",
             _count_rows(
                 db,
                 CircuitTouristique,
@@ -218,16 +218,16 @@ def _tourism_creation_metrics(db: Session, utilisateur_id: int) -> list[dict]:
 
 def _teambuilding_creation_metrics(db: Session, utilisateur_id: int) -> list[dict]:
     tracked_models = (
-        ("demandes", "Demandes Team Building creees", DemandeTeamBuilding, DemandeTeamBuilding.created_by_id),
-        ("offres", "Offres creees", Offre, Offre.id_utilisateur_cr),
-        ("activites", "Activites / seminaires crees", Activite, Activite.id_utilisateur_create),
-        ("clients", "Clients crees", Client, Client.id_utilisateur_create),
-        ("sites", "Sites crees", Site, Site.id_utilisateur_create),
-        ("jeux", "Jeux crees", Jeu, Jeu.id_utilisateur_create),
-        ("personnel", "Membres du personnel crees", Personnel, Personnel.id_utilisateur_create),
-        ("benevoles", "Benevoles crees", Benevole, Benevole.id_utilisateur_create),
-        ("depenses", "Depenses creees", Depense, Depense.id_utilisateur_cr),
-        ("materiels", "Materiels crees", Materiel, Materiel.id_utilisateur_create),
+        ("demandes", "Demandes Team Building créées", DemandeTeamBuilding, DemandeTeamBuilding.created_by_id),
+        ("offres", "Offres créées", Offre, Offre.id_utilisateur_cr),
+        ("activites", "Activités / séminaires créés", Activite, Activite.id_utilisateur_create),
+        ("clients", "Clients créés", Client, Client.id_utilisateur_create),
+        ("sites", "Sites créés", Site, Site.id_utilisateur_create),
+        ("jeux", "Jeux créés", Jeu, Jeu.id_utilisateur_create),
+        ("personnel", "Membres du personnel créés", Personnel, Personnel.id_utilisateur_create),
+        ("benevoles", "Bénévoles créés", Benevole, Benevole.id_utilisateur_create),
+        ("depenses", "Dépenses créées", Depense, Depense.id_utilisateur_cr),
+        ("materiels", "Matériels créés", Materiel, Materiel.id_utilisateur_create),
     )
     return [
         _creation_metric(

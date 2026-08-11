@@ -51,17 +51,17 @@ def _ensure_context_exists(
             detail="Utilisez /api/proformas-tourisme pour les proformas tourisme",
         )
     if demande_id and not crud_demande_team_building.get_demande_team_building(db, demande_id):
-        raise HTTPException(status_code=404, detail="Demande team building non trouvee")
+        raise HTTPException(status_code=404, detail="Demande team building non trouvée")
     if offre_id and not crud_offre.get_offre(db, offre_id):
-        raise HTTPException(status_code=404, detail="Offre non trouvee")
+        raise HTTPException(status_code=404, detail="Offre non trouvée")
     if site_id and not crud_site.get_site(db, site_id):
-        raise HTTPException(status_code=404, detail="Site non trouve")
+        raise HTTPException(status_code=404, detail="Site non trouvé")
 
 
 def _get_teambuilding_proforma_or_404(db: Session, proforma_id: int):
     db_proforma = crud_proforma.get_proforma(db, proforma_id)
     if not db_proforma or db_proforma.pole != "teambuilding":
-        raise HTTPException(status_code=404, detail="Proforma non trouvee")
+        raise HTTPException(status_code=404, detail="Proforma non trouvée")
     return db_proforma
 
 
@@ -160,7 +160,7 @@ def download_pdf(proforma_id: int, db: Session = Depends(get_db)):
     db_proforma = _get_teambuilding_proforma_or_404(db, proforma_id)
     pdf_path = crud_proforma.get_pdf_path(db_proforma)
     if not pdf_path or not pdf_path.exists() or not pdf_path.is_file():
-        raise HTTPException(status_code=404, detail="PDF non genere")
+        raise HTTPException(status_code=404, detail="PDF non généré")
     return FileResponse(
         path=Path(pdf_path),
         media_type="application/pdf",

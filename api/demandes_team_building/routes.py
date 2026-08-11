@@ -69,7 +69,7 @@ def get_demande_team_building(
 ):
     db_demande = crud_demande_team_building.get_demande_team_building(db, demande_id)
     if not db_demande:
-        raise HTTPException(status_code=404, detail="Demande team building non trouvee")
+        raise HTTPException(status_code=404, detail="Demande team building non trouvée")
     return db_demande
 
 
@@ -82,7 +82,7 @@ def update_demande_team_building_statut(
 ):
     db_demande = crud_demande_team_building.get_demande_team_building(db, demande_id)
     if not db_demande:
-        raise HTTPException(status_code=404, detail="Demande team building non trouvee")
+        raise HTTPException(status_code=404, detail="Demande team building non trouvée")
     if db_demande.statut != "nouvelle" or payload.statut != "contactee":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -109,7 +109,7 @@ def update_demande_team_building(
 ):
     db_demande = crud_demande_team_building.get_demande_team_building(db, demande_id)
     if not db_demande:
-        raise HTTPException(status_code=404, detail="Demande team building non trouvee")
+        raise HTTPException(status_code=404, detail="Demande team building non trouvée")
 
     updates = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
     updates["statut"] = db_demande.statut
@@ -125,7 +125,7 @@ def delete_demande_team_building(
     _ensure_can_delete_demande(current_user)
     db_demande = crud_demande_team_building.get_demande_team_building(db, demande_id)
     if not db_demande:
-        raise HTTPException(status_code=404, detail="Demande team building non trouvee")
+        raise HTTPException(status_code=404, detail="Demande team building non trouvée")
     crud_demande_team_building.delete_demande_team_building(db, db_demande)
 
 

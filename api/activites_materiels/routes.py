@@ -31,7 +31,7 @@ def _validate_materiel_actif(db_materiel) -> None:
     if db_materiel.statut is False:
         raise HTTPException(
             status_code=400,
-            detail=f"Materiel inactif: {db_materiel.nom} ne peut pas etre reserve",
+            detail=f"Matériel inactif: {db_materiel.nom} ne peut pas être réservé",
         )
 
 
@@ -45,7 +45,7 @@ def get_activites_materiels(skip: int = 0, limit: int = 100, db: Session = Depen
 def get_materiels_by_activite(activite_id: int, db: Session = Depends(get_db)):
     """Recuperer le materiel d'une activite."""
     if not crud_activite.get_activite(db, activite_id):
-        raise HTTPException(status_code=404, detail="Activite non trouvee")
+        raise HTTPException(status_code=404, detail="Activité non trouvée")
 
     return crud_activite_materiel.get_materiels_by_activite(db, activite_id)
 
@@ -54,7 +54,7 @@ def get_materiels_by_activite(activite_id: int, db: Session = Depends(get_db)):
 def get_activites_by_materiel(materiel_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Recuperer les activites qui utilisent un materiel."""
     if not crud_materiel.get_materiel(db, materiel_id):
-        raise HTTPException(status_code=404, detail="Materiel non trouve")
+        raise HTTPException(status_code=404, detail="Matériel non trouvé")
 
     return crud_activite_materiel.get_activites_by_materiel(db, materiel_id, skip=skip, limit=limit)
 
@@ -66,9 +66,9 @@ def get_disponibilites_materiels(
     exclude_activite_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
-    """Calculer le stock reellement disponible pendant une periode."""
+    """Calculer le stock réellement disponible pendant une période."""
     if date_fin <= date_debut:
-        raise HTTPException(status_code=400, detail="La date de fin doit etre apres la date de debut")
+        raise HTTPException(status_code=400, detail="La date de fin doit être après la date de début")
 
     return crud_activite_materiel.get_disponibilites_materiels(
         db,
@@ -83,7 +83,7 @@ def get_activite_materiel(activite_materiel_id: int, db: Session = Depends(get_d
     """Recuperer une affectation materiel."""
     db_activite_materiel = crud_activite_materiel.get_activite_materiel(db, activite_materiel_id)
     if not db_activite_materiel:
-        raise HTTPException(status_code=404, detail="Affectation materiel non trouvee")
+        raise HTTPException(status_code=404, detail="Affectation matériel non trouvée")
     return db_activite_materiel
 
 
@@ -92,16 +92,16 @@ def create_activite_materiel(payload: ActiviteMaterielCreate, db: Session = Depe
     """Ajouter du materiel a une activite."""
     db_activite = crud_activite.get_activite(db, payload.activite_id)
     if not db_activite:
-        raise HTTPException(status_code=404, detail="Activite non trouvee")
+        raise HTTPException(status_code=404, detail="Activité non trouvée")
 
     db_materiel = crud_materiel.get_materiel(db, payload.materiel_id)
     if not db_materiel:
-        raise HTTPException(status_code=404, detail="Materiel non trouve")
+        raise HTTPException(status_code=404, detail="Matériel non trouvé")
     _validate_materiel_actif(db_materiel)
 
     existing = crud_activite_materiel.get_activite_materiel_by_pair(db, payload.activite_id, payload.materiel_id)
     if existing:
-        raise HTTPException(status_code=409, detail="Ce materiel est deja ajoute a cette activite")
+        raise HTTPException(status_code=409, detail="Ce matériel est déjà ajouté à cette activité")
 
     if crud_activite_materiel.activite_reserve_materiel(db_activite.statut):
         crud_activite_materiel.lock_materiel_reservation(db, db_materiel.id)
@@ -115,7 +115,7 @@ def create_activite_materiel(payload: ActiviteMaterielCreate, db: Session = Depe
         if payload.quantite_prevue > quantite_disponible:
             raise HTTPException(
                 status_code=400,
-                detail=f"Stock insuffisant pour {db_materiel.nom}: {quantite_disponible} disponible(s) sur cette periode",
+                detail=f"Stock insuffisant pour {db_materiel.nom}: {quantite_disponible} disponible(s) sur cette période",
             )
 
     return crud_activite_materiel.create_activite_materiel(db, payload)
@@ -130,7 +130,7 @@ def update_activite_materiel(
     """Mettre a jour une affectation materiel."""
     db_activite_materiel = crud_activite_materiel.get_activite_materiel(db, activite_materiel_id)
     if not db_activite_materiel:
-        raise HTTPException(status_code=404, detail="Affectation materiel non trouvee")
+        raise HTTPException(status_code=404, detail="Affectation matériel non trouvée")
 
     updates = payload.model_dump(exclude_unset=True) if hasattr(payload, "model_dump") else payload.dict(exclude_unset=True)
     if "quantite_prevue" in updates and updates["quantite_prevue"] is not None:
@@ -149,7 +149,7 @@ def update_activite_materiel(
             if updates["quantite_prevue"] > quantite_disponible:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Stock insuffisant pour {db_materiel.nom}: {quantite_disponible} disponible(s) sur cette periode",
+                detail=f"Stock insuffisant pour {db_materiel.nom}: {quantite_disponible} disponible(s) sur cette période",
                 )
 
     return crud_activite_materiel.update_activite_materiel(db, db_activite_materiel, payload)
@@ -160,6 +160,6 @@ def delete_activite_materiel(activite_materiel_id: int, db: Session = Depends(ge
     """Retirer du materiel d'une activite."""
     db_activite_materiel = crud_activite_materiel.get_activite_materiel(db, activite_materiel_id)
     if not db_activite_materiel:
-        raise HTTPException(status_code=404, detail="Affectation materiel non trouvee")
+        raise HTTPException(status_code=404, detail="Affectation matériel non trouvée")
 
     crud_activite_materiel.delete_activite_materiel(db, db_activite_materiel)

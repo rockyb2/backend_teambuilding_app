@@ -34,7 +34,7 @@ def get_role(
 ):
     db_role = crud_role.get_role(db, role_id)
     if not db_role:
-        raise HTTPException(status_code=404, detail="Role non trouve")
+        raise HTTPException(status_code=404, detail="Rôle non trouvé")
     return db_role
 
 
@@ -46,7 +46,7 @@ def create_role(
 ):
     existing = crud_role.get_role_by_name(db, payload.nom_role)
     if existing:
-        raise HTTPException(status_code=400, detail="Ce role existe deja")
+        raise HTTPException(status_code=400, detail="Ce rôle existe déjà")
     return crud_role.create_role(db, payload)
 
 
@@ -59,12 +59,12 @@ def update_role(
 ):
     db_role = crud_role.get_role(db, role_id)
     if not db_role:
-        raise HTTPException(status_code=404, detail="Role non trouve")
+        raise HTTPException(status_code=404, detail="Rôle non trouvé")
 
     if payload.nom_role and payload.nom_role != db_role.nom_role:
         existing = crud_role.get_role_by_name(db, payload.nom_role)
         if existing:
-            raise HTTPException(status_code=400, detail="Ce role existe deja")
+            raise HTTPException(status_code=400, detail="Ce rôle existe déjà")
 
     return crud_role.update_role(db, db_role, payload)
 
@@ -77,7 +77,7 @@ def delete_role(
 ):
     db_role = crud_role.get_role(db, role_id)
     if not db_role:
-        raise HTTPException(status_code=404, detail="Role non trouve")
+        raise HTTPException(status_code=404, detail="Rôle non trouvé")
 
     try:
         crud_role.delete_role(db, db_role)
@@ -85,5 +85,5 @@ def delete_role(
         db.rollback()
         raise HTTPException(
             status_code=400,
-            detail="Impossible de supprimer ce role car il est encore utilise par un ou plusieurs utilisateurs",
+            detail="Impossible de supprimer ce rôle car il est encore utilisé par un ou plusieurs utilisateurs",
         )

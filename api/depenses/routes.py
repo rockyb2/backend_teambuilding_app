@@ -38,77 +38,77 @@ def _validate_depense_relations(db: Session, data: dict):
     if data.get("categorie_depense_id") is not None:
         categorie = crud_depense.get_categorie_depense(db, data["categorie_depense_id"])
         if not categorie:
-            raise HTTPException(status_code=404, detail="Categorie de depense non trouvee")
+            raise HTTPException(status_code=404, detail="Catégorie de dépense non trouvée")
 
     if data.get("offre_id") is not None:
         if pole != "teambuilding":
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Une offre team building doit etre liee a une depense teambuilding",
+                detail="Une offre team building doit être liée à une dépense teambuilding",
             )
         if not crud_offre.get_offre(db, data["offre_id"]):
-            raise HTTPException(status_code=404, detail="Offre non trouvee")
+            raise HTTPException(status_code=404, detail="Offre non trouvée")
 
     if data.get("activite_id") is not None:
         if pole != "teambuilding":
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Une activite doit etre liee a une depense teambuilding",
+                detail="Une activité doit être liée à une dépense teambuilding",
             )
         if not crud_activite.get_activite(db, data["activite_id"]):
-            raise HTTPException(status_code=404, detail="Activite non trouvee")
+            raise HTTPException(status_code=404, detail="Activité non trouvée")
 
     if data.get("proforma_id") is not None:
         proforma = crud_proforma.get_proforma(db, data["proforma_id"])
         if not proforma:
-            raise HTTPException(status_code=404, detail="Proforma non trouvee")
+            raise HTTPException(status_code=404, detail="Proforma non trouvée")
         if proforma.pole != pole:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Le pole de la depense doit correspondre au pole de la proforma",
+                detail="Le pôle de la dépense doit correspondre au pôle de la proforma",
             )
 
     if data.get("facture_id") is not None:
         facture = crud_facture.get_facture(db, data["facture_id"])
         if not facture:
-            raise HTTPException(status_code=404, detail="Facture non trouvee")
+            raise HTTPException(status_code=404, detail="Facture non trouvée")
         if facture.pole != pole:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Le pole de la depense doit correspondre au pole de la facture",
+                detail="Le pôle de la dépense doit correspondre au pôle de la facture",
             )
 
     if data.get("demande_team_building_id") is not None:
         if pole != "teambuilding":
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Une demande team building doit etre liee a une depense teambuilding",
+                detail="Une demande team building doit être liée à une dépense teambuilding",
             )
         if not crud_demande_team_building.get_demande_team_building(db, data["demande_team_building_id"]):
-            raise HTTPException(status_code=404, detail="Demande team building non trouvee")
+            raise HTTPException(status_code=404, detail="Demande team building non trouvée")
 
     if data.get("demande_tourisme_id") is not None:
         if pole != "tourisme":
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Une demande tourisme doit etre liee a une depense tourisme",
+                detail="Une demande tourisme doit être liée à une dépense tourisme",
             )
         if not crud_demande_tourisme.get_demande_tourisme(db, data["demande_tourisme_id"]):
-            raise HTTPException(status_code=404, detail="Demande tourisme non trouvee")
+            raise HTTPException(status_code=404, detail="Demande tourisme non trouvée")
 
     if data.get("demande_tourisme_custom_id") is not None:
         if pole != "tourisme":
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Une demande tourisme personnalisee doit etre liee a une depense tourisme",
+                detail="Une demande tourisme personnalisée doit être liée à une dépense tourisme",
             )
         if not crud_demande_tourisme.get_demande_tourisme_custom(db, data["demande_tourisme_custom_id"]):
-            raise HTTPException(status_code=404, detail="Demande tourisme personnalisee non trouvee")
+            raise HTTPException(status_code=404, detail="Demande tourisme personnalisée non trouvée")
 
     if data.get("id_utilisateur_cr") is not None:
         utilisateur = crud_utilisateur.get_utilisateur(db, data["id_utilisateur_cr"])
         if not utilisateur:
-            raise HTTPException(status_code=404, detail="Utilisateur createur non trouve")
+            raise HTTPException(status_code=404, detail="Utilisateur créateur non trouvé")
 
 
 def _depense_context(db_depense) -> dict:
@@ -156,7 +156,7 @@ def get_depenses(
 def get_depenses_by_activite(activite_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Recuperer les depenses d'une activite."""
     if not crud_activite.get_activite(db, activite_id):
-        raise HTTPException(status_code=404, detail="Activite non trouvee")
+        raise HTTPException(status_code=404, detail="Activité non trouvée")
 
     return crud_depense.get_depenses_by_activite(db, activite_id, skip=skip, limit=limit)
 
@@ -165,7 +165,7 @@ def get_depenses_by_activite(activite_id: int, skip: int = 0, limit: int = 100, 
 def get_depenses_by_offre(offre_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Recuperer les depenses d'une offre."""
     if not crud_offre.get_offre(db, offre_id):
-        raise HTTPException(status_code=404, detail="Offre non trouvee")
+        raise HTTPException(status_code=404, detail="Offre non trouvée")
 
     return crud_depense.get_depenses_by_offre(db, offre_id, skip=skip, limit=limit)
 
@@ -174,7 +174,7 @@ def get_depenses_by_offre(offre_id: int, skip: int = 0, limit: int = 100, db: Se
 def get_depenses_by_categorie(categorie_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Recuperer les depenses d'une categorie."""
     if not crud_depense.get_categorie_depense(db, categorie_id):
-        raise HTTPException(status_code=404, detail="Categorie de depense non trouvee")
+        raise HTTPException(status_code=404, detail="Catégorie de dépense non trouvée")
 
     return crud_depense.get_depenses_by_categorie(db, categorie_id, skip=skip, limit=limit)
 
@@ -184,7 +184,7 @@ def get_depense(depense_id: int, db: Session = Depends(get_db)):
     """Recuperer une depense par ID."""
     db_depense = crud_depense.get_depense(db, depense_id)
     if not db_depense:
-        raise HTTPException(status_code=404, detail="Depense non trouvee")
+        raise HTTPException(status_code=404, detail="Dépense non trouvée")
     return db_depense
 
 
@@ -207,13 +207,13 @@ def update_depense(depense_id: int, payload: DepenseUpdate, db: Session = Depend
     """Mettre a jour une depense."""
     db_depense = crud_depense.get_depense(db, depense_id)
     if not db_depense:
-        raise HTTPException(status_code=404, detail="Depense non trouvee")
+        raise HTTPException(status_code=404, detail="Dépense non trouvée")
 
     updates = _payload_dump(payload, exclude_unset=True)
     if updates.get("pole") is None and "pole" in updates:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Le pole de la depense est obligatoire",
+            detail="Le pôle de la dépense est obligatoire",
         )
     context = _depense_context(db_depense)
     context.update(updates)
@@ -227,6 +227,6 @@ def delete_depense(depense_id: int, db: Session = Depends(get_db)):
     """Supprimer une depense."""
     db_depense = crud_depense.get_depense(db, depense_id)
     if not db_depense:
-        raise HTTPException(status_code=404, detail="Depense non trouvee")
+        raise HTTPException(status_code=404, detail="Dépense non trouvée")
 
     crud_depense.delete_depense(db, db_depense)

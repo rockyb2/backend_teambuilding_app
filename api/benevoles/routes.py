@@ -30,7 +30,7 @@ def get_benevoles(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
 def get_benevole(benevole_id: int, db: Session = Depends(get_db)):
     db_benevole = crud_benevole.get_benevole(db, benevole_id)
     if not db_benevole:
-        raise HTTPException(status_code=404, detail="Benevole non trouve")
+        raise HTTPException(status_code=404, detail="Bénévole non trouvé")
     return db_benevole
 
 
@@ -45,7 +45,7 @@ def create_benevole(
 
     existing = crud_benevole.get_benevole_by_email(db, payload.email)
     if existing:
-        raise HTTPException(status_code=400, detail="Email deja utilise")
+        raise HTTPException(status_code=400, detail="Email déjà utilisé")
 
     payload.id_utilisateur_create = getattr(current_user, "id_utilisateur", None)
     return crud_benevole.create_benevole(db, payload)
@@ -55,7 +55,7 @@ def create_benevole(
 def update_benevole(benevole_id: int, payload: BenevoleUpdate, db: Session = Depends(get_db)):
     db_benevole = crud_benevole.get_benevole(db, benevole_id)
     if not db_benevole:
-        raise HTTPException(status_code=404, detail="Benevole non trouve")
+        raise HTTPException(status_code=404, detail="Bénévole non trouvé")
 
     updates = _model_dump(payload, exclude_unset=True)
     if "email" in updates:
@@ -65,7 +65,7 @@ def update_benevole(benevole_id: int, payload: BenevoleUpdate, db: Session = Dep
     if "email" in updates and updates["email"] != db_benevole.email:
         existing = crud_benevole.get_benevole_by_email(db, updates["email"])
         if existing:
-            raise HTTPException(status_code=400, detail="Email deja utilise")
+            raise HTTPException(status_code=400, detail="Email déjà utilisé")
 
     return crud_benevole.update_benevole(db, db_benevole, updates)
 
@@ -74,6 +74,6 @@ def update_benevole(benevole_id: int, payload: BenevoleUpdate, db: Session = Dep
 def delete_benevole(benevole_id: int, db: Session = Depends(get_db)):
     db_benevole = crud_benevole.get_benevole(db, benevole_id)
     if not db_benevole:
-        raise HTTPException(status_code=404, detail="Benevole non trouve")
+        raise HTTPException(status_code=404, detail="Bénévole non trouvé")
 
     crud_benevole.delete_benevole(db, db_benevole)

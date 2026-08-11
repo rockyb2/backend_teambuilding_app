@@ -39,37 +39,37 @@ def _validate_facture_relations(db: Session, data: dict) -> None:
     if data.get("proforma_id") is not None:
         proforma = crud_proforma.get_proforma(db, data["proforma_id"])
         if not proforma:
-            raise HTTPException(status_code=404, detail="Proforma non trouvee")
+            raise HTTPException(status_code=404, detail="Proforma non trouvée")
 
     if data.get("demande_team_building_id") is not None:
         if not crud_demande_team_building.get_demande_team_building(db, data["demande_team_building_id"]):
-            raise HTTPException(status_code=404, detail="Demande team building non trouvee")
+            raise HTTPException(status_code=404, detail="Demande team building non trouvée")
 
     if data.get("demande_tourisme_id") is not None:
         if not crud_demande_tourisme.get_demande_tourisme(db, data["demande_tourisme_id"]):
-            raise HTTPException(status_code=404, detail="Demande tourisme non trouvee")
+            raise HTTPException(status_code=404, detail="Demande tourisme non trouvée")
 
     if data.get("demande_tourisme_custom_id") is not None:
         if not crud_demande_tourisme.get_demande_tourisme_custom(db, data["demande_tourisme_custom_id"]):
-            raise HTTPException(status_code=404, detail="Demande tourisme personnalisee non trouvee")
+            raise HTTPException(status_code=404, detail="Demande tourisme personnalisée non trouvée")
 
     if proforma and pole and proforma.pole != pole:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Le pole de la facture doit correspondre au pole de la proforma",
+            detail="Le pôle de la facture doit correspondre au pôle de la proforma",
         )
 
     if data.get("demande_team_building_id") is not None and pole != "teambuilding":
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Une demande team building doit etre liee a une facture teambuilding",
+            detail="Une demande team building doit être liée à une facture teambuilding",
         )
 
     has_tourism_context = data.get("demande_tourisme_id") is not None or data.get("demande_tourisme_custom_id") is not None
     if has_tourism_context and pole != "tourisme":
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Une demande tourisme doit etre liee a une facture tourisme",
+            detail="Une demande tourisme doit être liée à une facture tourisme",
         )
 
 
@@ -86,14 +86,14 @@ def _facture_context(db_facture) -> dict:
 def _get_facture_or_404(db: Session, facture_id: int):
     db_facture = crud_facture.get_facture(db, facture_id)
     if not db_facture:
-        raise HTTPException(status_code=404, detail="Facture non trouvee")
+        raise HTTPException(status_code=404, detail="Facture non trouvée")
     return db_facture
 
 
 def _get_paiement_or_404(db: Session, paiement_id: int):
     db_paiement = crud_facture.get_paiement(db, paiement_id)
     if not db_paiement:
-        raise HTTPException(status_code=404, detail="Paiement non trouve")
+        raise HTTPException(status_code=404, detail="Paiement non trouvé")
     return db_paiement
 
 
@@ -134,7 +134,7 @@ def create_facture_from_proforma(
 ):
     db_proforma = crud_proforma.get_proforma(db, proforma_id)
     if not db_proforma:
-        raise HTTPException(status_code=404, detail="Proforma non trouvee")
+        raise HTTPException(status_code=404, detail="Proforma non trouvée")
     try:
         return crud_facture.create_facture_from_proforma(
             db,

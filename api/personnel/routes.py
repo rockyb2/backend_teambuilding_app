@@ -36,7 +36,7 @@ def get_personnel(personnel_id: int, db: Session = Depends(get_db)):
     """Recuperer un membre du personnel par ID"""
     db_personnel = crud_personnel.get_personnel(db, personnel_id)
     if not db_personnel:
-        raise HTTPException(status_code=404, detail="Personnel non trouve")
+        raise HTTPException(status_code=404, detail="Personnel non trouvé")
     return db_personnel
 
 
@@ -50,7 +50,7 @@ def create_personnel(
     if payload.email:
         existing = crud_personnel.get_personnel_by_email(db, payload.email)
         if existing:
-            raise HTTPException(status_code=400, detail="Email deja utilise")
+            raise HTTPException(status_code=400, detail="Email déjà utilisé")
 
     payload.id_utilisateur_create = getattr(current_user, "id_utilisateur", None)
     return crud_personnel.create_personnel(db, payload)
@@ -61,13 +61,13 @@ def update_personnel(personnel_id: int, payload: PersonnelUpdate, db: Session = 
     """Mettre a jour un membre du personnel"""
     db_personnel = crud_personnel.get_personnel(db, personnel_id)
     if not db_personnel:
-        raise HTTPException(status_code=404, detail="Personnel non trouve")
+        raise HTTPException(status_code=404, detail="Personnel non trouvé")
 
     updates = payload.model_dump(exclude_unset=True)
     if "email" in updates and updates["email"] and updates["email"] != db_personnel.email:
         existing = crud_personnel.get_personnel_by_email(db, updates["email"])
         if existing:
-            raise HTTPException(status_code=400, detail="Email deja utilise")
+            raise HTTPException(status_code=400, detail="Email déjà utilisé")
 
     return crud_personnel.update_personnel(db, db_personnel, updates)
 
@@ -77,6 +77,6 @@ def delete_personnel(personnel_id: int, db: Session = Depends(get_db)):
     """Supprimer un membre du personnel"""
     db_personnel = crud_personnel.get_personnel(db, personnel_id)
     if not db_personnel:
-        raise HTTPException(status_code=404, detail="Personnel non trouve")
+        raise HTTPException(status_code=404, detail="Personnel non trouvé")
 
     crud_personnel.delete_personnel(db, db_personnel)

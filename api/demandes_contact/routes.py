@@ -47,7 +47,7 @@ def get_demande_contact(
 ):
     db_demande = crud_demande_contact.get_demande_contact(db, demande_id)
     if not db_demande:
-        raise HTTPException(status_code=404, detail="Demande contact non trouvee")
+        raise HTTPException(status_code=404, detail="Demande contact non trouvée")
     return db_demande
 
 

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from agentautomatisation.agentcore import chat_with_agent
+from agentautomatisation.agent_chatbot import chat_with_agent
 from api.dependencies import get_db
 from crud import chat as crud_chat
 from observability.langfuse_setup import (

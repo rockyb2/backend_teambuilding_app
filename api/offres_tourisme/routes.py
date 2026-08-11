@@ -34,12 +34,12 @@ def _validate_target(
     if (demande_tourisme_id is None) == (demande_tourisme_custom_id is None):
         raise HTTPException(
             status_code=422,
-            detail="Une offre tourisme doit etre liee a une seule demande",
+            detail="Une offre tourisme doit être liée à une seule demande",
         )
 
     if demande_tourisme_id is not None:
         if not crud_demande_tourisme.get_demande_tourisme(db, demande_tourisme_id):
-            raise HTTPException(status_code=404, detail="Demande tourisme non trouvee")
+            raise HTTPException(status_code=404, detail="Demande tourisme non trouvée")
         return
 
     if not crud_demande_tourisme.get_demande_tourisme_custom(
@@ -48,7 +48,7 @@ def _validate_target(
     ):
         raise HTTPException(
             status_code=404,
-            detail="Demande tourisme personnalisee non trouvee",
+            detail="Demande tourisme personnalisée non trouvée",
         )
 
 
@@ -65,7 +65,7 @@ def get_offres_tourisme(
 def get_offre_tourisme(offre_id: int, db: Session = Depends(get_db)):
     db_offre = crud_offre_tourisme.get_offre_tourisme(db, offre_id)
     if not db_offre:
-        raise HTTPException(status_code=404, detail="Offre tourisme non trouvee")
+        raise HTTPException(status_code=404, detail="Offre tourisme non trouvée")
     return db_offre
 
 
@@ -96,7 +96,7 @@ def update_offre_tourisme(
 ):
     db_offre = crud_offre_tourisme.get_offre_tourisme(db, offre_id)
     if not db_offre:
-        raise HTTPException(status_code=404, detail="Offre tourisme non trouvee")
+        raise HTTPException(status_code=404, detail="Offre tourisme non trouvée")
 
     updates = _payload_dump(payload, exclude_unset=True)
     _validate_target(
@@ -123,7 +123,7 @@ def delete_offre_tourisme(
 ):
     db_offre = crud_offre_tourisme.get_offre_tourisme(db, offre_id)
     if not db_offre:
-        raise HTTPException(status_code=404, detail="Offre tourisme non trouvee")
+        raise HTTPException(status_code=404, detail="Offre tourisme non trouvée")
     crud_offre_tourisme.delete_offre_tourisme(
         db,
         db_offre,

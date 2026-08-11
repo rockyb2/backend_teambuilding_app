@@ -40,7 +40,7 @@ def _production_values(payload: dict, db_materiel: Materiel | None = None) -> di
     if not marque or not str(marque).strip():
         raise HTTPException(status_code=422, detail="La marque est obligatoire")
     if not modele or not str(modele).strip():
-        raise HTTPException(status_code=422, detail="Le modele est obligatoire")
+        raise HTTPException(status_code=422, detail="Le modèle est obligatoire")
 
     values = {
         "marque": str(marque).strip(),
@@ -63,8 +63,8 @@ def _validate_stock_total_supports_reservations(db: Session, materiel_id: int, u
         raise HTTPException(
             status_code=400,
             detail=(
-                "Impossible de baisser le stock total sous les reservations deja planifiees: "
-                f"{quantite_reservee_max} unite(s) sont reservees sur au moins une periode"
+                "Impossible de baisser le stock total sous les réservations déjà planifiées: "
+                f"{quantite_reservee_max} unité(s) sont réservées sur au moins une période"
             ),
         )
 
@@ -72,7 +72,7 @@ def _validate_stock_total_supports_reservations(db: Session, materiel_id: int, u
 def _get_production_materiel_or_404(db: Session, materiel_id: int) -> Materiel:
     db_materiel = crud_materiel.get_materiel(db, materiel_id)
     if not db_materiel or not db_materiel.marque or not db_materiel.modele:
-        raise HTTPException(status_code=404, detail="Materiel de production non trouve")
+        raise HTTPException(status_code=404, detail="Matériel de production non trouvé")
     return db_materiel
 
 
@@ -102,7 +102,7 @@ def create_materiel_production(
     values = _production_values(_payload_dump(payload))
     existing = crud_materiel.get_materiel_by_nom(db, values["nom"])
     if existing:
-        raise HTTPException(status_code=409, detail="Materiel deja existant")
+        raise HTTPException(status_code=409, detail="Matériel déjà existant")
 
     values["description"] = None
     values["statut"] = True
@@ -121,7 +121,7 @@ def update_materiel_production(
     if updates["nom"] != db_materiel.nom:
         existing = crud_materiel.get_materiel_by_nom(db, updates["nom"])
         if existing and existing.id != db_materiel.id:
-            raise HTTPException(status_code=409, detail="Materiel deja existant")
+            raise HTTPException(status_code=409, detail="Matériel déjà existant")
 
     _validate_stock_total_supports_reservations(db, db_materiel.id, updates)
     return crud_materiel.update_materiel(db, db_materiel, updates)

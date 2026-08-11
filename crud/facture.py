@@ -142,7 +142,7 @@ def _ensure_paiement_allowed(
     if db_facture.statut == "annulee":
         raise ValueError("Impossible d'ajouter un paiement sur une facture annulee")
     if montant <= 0:
-        raise ValueError("Le montant du paiement doit etre superieur a zero")
+        raise ValueError("Le montant du paiement doit être supérieur à zéro")
 
     total_hors_paiement = _payments_total(db, db_facture.id, exclude_paiement_id=exclude_paiement_id)
     if total_hors_paiement + montant > _decimal(db_facture.montant_facture):

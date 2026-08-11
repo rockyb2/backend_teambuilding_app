@@ -45,9 +45,9 @@ def _send_access_email_safely(utilisateur, plain_password: str) -> None:
     try:
         sent = send_user_access_email(utilisateur, plain_password)
         if not sent:
-            print(f"SMTP desactive: acces CRM non envoyes a {utilisateur.email}")
+            print(f"SMTP désactivé: accès CRM non envoyés à {utilisateur.email}")
     except Exception as exc:
-        print(f"Echec envoi acces CRM utilisateur {utilisateur.id_utilisateur}: {exc}")
+        print(f"Échec envoi accès CRM utilisateur {utilisateur.id_utilisateur}: {exc}")
 
 
 def _auth_user_response(utilisateur):
@@ -130,7 +130,7 @@ def get_utilisateur_activity_summary(
 ):
     db_utilisateur = crud_utilisateur.get_utilisateur(db, utilisateur_id)
     if not db_utilisateur:
-        raise HTTPException(status_code=404, detail="Utilisateur non trouve")
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
 
     return crud_utilisateur.get_utilisateur_activity_summary(db, db_utilisateur)
 
@@ -143,7 +143,7 @@ def get_utilisateur(
 ):
     db_utilisateur = crud_utilisateur.get_utilisateur(db, utilisateur_id)
     if not db_utilisateur:
-        raise HTTPException(status_code=404, detail="Utilisateur non trouve")
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
     return db_utilisateur
 
 
@@ -155,7 +155,7 @@ def create_utilisateur(
 ):
     existing = crud_utilisateur.get_utilisateur_by_email(db, payload.email)
     if existing:
-        raise HTTPException(status_code=400, detail="Email deja utilise")
+        raise HTTPException(status_code=400, detail="Email déjà utilisé")
 
     requested_role = payload.role
     if requested_role is None and payload.id_role is not None:
@@ -164,7 +164,7 @@ def create_utilisateur(
 
     # Admin can create users but cannot elevate anyone to super_admin.
     if not can_assign_role(current_user, requested_role):
-        raise HTTPException(status_code=403, detail="Vous ne pouvez pas attribuer ce role")
+        raise HTTPException(status_code=403, detail="Vous ne pouvez pas attribuer ce rôle")
 
     try:
         db_utilisateur = crud_utilisateur.create_utilisateur(db, payload)
@@ -184,7 +184,7 @@ def update_utilisateur(
 ):
     db_utilisateur = crud_utilisateur.get_utilisateur(db, utilisateur_id)
     if not db_utilisateur:
-        raise HTTPException(status_code=404, detail="Utilisateur non trouve")
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
 
     # Admin cannot modify a super_admin account. This remains reserved to super_admin.
     if not is_super_admin(current_user) and normalize_role_name(db_utilisateur.role) == "super_admin":
@@ -193,7 +193,7 @@ def update_utilisateur(
     if payload.email and payload.email != db_utilisateur.email:
         existing = crud_utilisateur.get_utilisateur_by_email(db, payload.email)
         if existing:
-            raise HTTPException(status_code=400, detail="Email deja utilise")
+            raise HTTPException(status_code=400, detail="Email déjà utilisé")
 
     requested_role = payload.role
     if requested_role is None and payload.id_role is not None:
@@ -201,7 +201,7 @@ def update_utilisateur(
         requested_role = db_role.nom_role if db_role else None
 
     if requested_role and not can_assign_role(current_user, requested_role):
-        raise HTTPException(status_code=403, detail="Vous ne pouvez pas attribuer ce role")
+        raise HTTPException(status_code=403, detail="Vous ne pouvez pas attribuer ce rôle")
 
     try:
         return crud_utilisateur.update_utilisateur(db, db_utilisateur, payload)
@@ -217,7 +217,7 @@ def delete_utilisateur(
 ):
     db_utilisateur = crud_utilisateur.get_utilisateur(db, utilisateur_id)
     if not db_utilisateur:
-        raise HTTPException(status_code=404, detail="Utilisateur non trouve")
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
 
     if db_utilisateur.id_utilisateur == getattr(current_user, "id_utilisateur", None):
         raise HTTPException(status_code=403, detail="Vous ne pouvez pas supprimer votre propre compte")
@@ -266,7 +266,7 @@ def refresh_access_token(payload: RefreshTokenRequest):
         access_token = create_access_token(user_payload, expires_delta=timedelta(minutes=30))
         return {"access_token": access_token, "token_type": "bearer"}
     except Exception:
-        raise HTTPException(status_code=401, detail="Refresh token invalide ou expire")
+        raise HTTPException(status_code=401, detail="Refresh token invalide ou expiré")
 
 
 @router.get("/auth/me", response_model=AuthUserResponse)
@@ -282,7 +282,7 @@ def update_me(
 ):
     db_utilisateur = crud_utilisateur.get_utilisateur(db, current_user.id_utilisateur)
     if not db_utilisateur:
-        raise HTTPException(status_code=404, detail="Utilisateur non trouve")
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
 
     updates = payload.model_dump(exclude_unset=True) if hasattr(payload, "model_dump") else payload.dict(exclude_unset=True)
 
@@ -297,14 +297,14 @@ def update_me(
     if "email" in updates:
         updates["email"] = (updates["email"] or "").strip().lower()
         if not updates["email"]:
-            raise HTTPException(status_code=400, detail="L email est obligatoire")
+            raise HTTPException(status_code=400, detail="L'email est obligatoire")
         email_local, separator, email_domain = updates["email"].partition("@")
         if not email_local or not separator or "." not in email_domain:
-            raise HTTPException(status_code=400, detail="L email est invalide")
+            raise HTTPException(status_code=400, detail="L'email est invalide")
 
         existing = crud_utilisateur.get_utilisateur_by_email(db, updates["email"])
         if existing and existing.id_utilisateur != db_utilisateur.id_utilisateur:
-            raise HTTPException(status_code=400, detail="Email deja utilise")
+            raise HTTPException(status_code=400, detail="Email déjà utilisé")
 
     if "image_utilisateur" in updates and updates["image_utilisateur"] is not None:
         updates["image_utilisateur"] = updates["image_utilisateur"].strip() or None
@@ -322,12 +322,12 @@ def change_my_password(
 ):
     db_utilisateur = crud_utilisateur.get_utilisateur(db, current_user.id_utilisateur)
     if not db_utilisateur:
-        raise HTTPException(status_code=404, detail="Utilisateur non trouve")
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
 
     if payload.current_password == payload.new_password:
         raise HTTPException(
             status_code=400,
-            detail="Le nouveau mot de passe doit etre different de l ancien",
+            detail="Le nouveau mot de passe doit être différent de l'ancien",
         )
 
     changed = crud_utilisateur.change_utilisateur_password(
@@ -339,4 +339,4 @@ def change_my_password(
     if not changed:
         raise HTTPException(status_code=400, detail="Mot de passe actuel incorrect")
 
-    return {"message": "Mot de passe modifie avec succes"}
+    return {"message": "Mot de passe modifié avec succès"}

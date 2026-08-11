@@ -31,8 +31,8 @@ def _validate_stock_total_supports_reservations(db: Session, materiel_id: int, u
         raise HTTPException(
             status_code=400,
             detail=(
-                "Impossible de baisser le stock total sous les reservations deja planifiees: "
-                f"{quantite_reservee_max} unite(s) sont reservees sur au moins une periode"
+                "Impossible de baisser le stock total sous les réservations déjà planifiées: "
+                f"{quantite_reservee_max} unité(s) sont réservées sur au moins une période"
             ),
         )
 
@@ -48,7 +48,7 @@ def get_materiel(materiel_id: int, db: Session = Depends(get_db)):
     """Recuperer un materiel par ID."""
     db_materiel = crud_materiel.get_materiel(db, materiel_id)
     if not db_materiel:
-        raise HTTPException(status_code=404, detail="Materiel non trouve")
+        raise HTTPException(status_code=404, detail="Matériel non trouvé")
     return db_materiel
 
 
@@ -61,7 +61,7 @@ def create_materiel(
     """Creer un materiel."""
     existing = crud_materiel.get_materiel_by_nom(db, payload.nom)
     if existing:
-        raise HTTPException(status_code=409, detail="Materiel deja existant")
+        raise HTTPException(status_code=409, detail="Matériel déjà existant")
 
     payload.id_utilisateur_create = getattr(current_user, "id_utilisateur", None)
     return crud_materiel.create_materiel(db, payload)
@@ -72,13 +72,13 @@ def update_materiel(materiel_id: int, payload: MaterielUpdate, db: Session = Dep
     """Mettre a jour un materiel."""
     db_materiel = crud_materiel.get_materiel(db, materiel_id)
     if not db_materiel:
-        raise HTTPException(status_code=404, detail="Materiel non trouve")
+        raise HTTPException(status_code=404, detail="Matériel non trouvé")
 
     updates = payload.model_dump(exclude_unset=True) if hasattr(payload, "model_dump") else payload.dict(exclude_unset=True)
     if "nom" in updates and updates["nom"] and updates["nom"] != db_materiel.nom:
         existing = crud_materiel.get_materiel_by_nom(db, updates["nom"])
         if existing:
-            raise HTTPException(status_code=409, detail="Materiel deja existant")
+            raise HTTPException(status_code=409, detail="Matériel déjà existant")
 
     _validate_stock_total_supports_reservations(db, db_materiel.id, updates)
     return crud_materiel.update_materiel(db, db_materiel, payload)
@@ -89,6 +89,6 @@ def delete_materiel(materiel_id: int, db: Session = Depends(get_db)):
     """Supprimer un materiel."""
     db_materiel = crud_materiel.get_materiel(db, materiel_id)
     if not db_materiel:
-        raise HTTPException(status_code=404, detail="Materiel non trouve")
+        raise HTTPException(status_code=404, detail="Matériel non trouvé")
 
     crud_materiel.delete_materiel(db, db_materiel)

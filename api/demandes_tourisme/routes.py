@@ -75,7 +75,7 @@ def get_demande_tourisme_custom(
 ):
     db_demande = crud_demande_tourisme.get_demande_tourisme_custom(db, demande_id)
     if not db_demande:
-        raise HTTPException(status_code=404, detail="Demande tourisme personnalisee non trouvee")
+        raise HTTPException(status_code=404, detail="Demande tourisme personnalisée non trouvée")
     return db_demande
 
 
@@ -88,13 +88,13 @@ def update_demande_tourisme_custom_statut(
 ):
     db_demande = crud_demande_tourisme.get_demande_tourisme_custom(db, demande_id)
     if not db_demande:
-        raise HTTPException(status_code=404, detail="Demande tourisme personnalisee non trouvee")
+        raise HTTPException(status_code=404, detail="Demande tourisme personnalisée non trouvée")
     if db_demande.statut != "nouvelle" or payload.statut != "contactee":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
                 "L'utilisateur peut uniquement faire passer une nouvelle demande "
-                "au statut contactee. Les statuts suivants sont pilotes par les offres."
+                "au statut contactée. Les statuts suivants sont pilotés par les offres."
             ),
         )
 
@@ -119,7 +119,7 @@ def update_demande_tourisme_custom(
 ):
     db_demande = crud_demande_tourisme.get_demande_tourisme_custom(db, demande_id)
     if not db_demande:
-        raise HTTPException(status_code=404, detail="Demande tourisme personnalisee non trouvee")
+        raise HTTPException(status_code=404, detail="Demande tourisme personnalisée non trouvée")
 
     try:
         payload = dict(payload)
@@ -145,7 +145,7 @@ def get_historique_demande_tourisme_custom(
 ):
     db_demande = crud_demande_tourisme.get_demande_tourisme_custom(db, demande_id)
     if not db_demande:
-        raise HTTPException(status_code=404, detail="Demande tourisme personnalisee non trouvee")
+        raise HTTPException(status_code=404, detail="Demande tourisme personnalisée non trouvée")
     return crud_demande_tourisme.get_historique_demande_tourisme_custom(db, demande_id)
 
 
@@ -158,7 +158,7 @@ def delete_demande_tourisme_custom(
     _ensure_can_delete_demande(current_user)
     db_demande = crud_demande_tourisme.get_demande_tourisme_custom(db, demande_id)
     if not db_demande:
-        raise HTTPException(status_code=404, detail="Demande tourisme personnalisee non trouvee")
+        raise HTTPException(status_code=404, detail="Demande tourisme personnalisée non trouvée")
     crud_demande_tourisme.delete_demande_tourisme_custom(db, db_demande)
 
 
@@ -170,7 +170,7 @@ def get_demande_tourisme(
 ):
     db_demande = crud_demande_tourisme.get_demande_tourisme(db, demande_id)
     if not db_demande:
-        raise HTTPException(status_code=404, detail="Demande tourisme non trouvee")
+        raise HTTPException(status_code=404, detail="Demande tourisme non trouvée")
     return db_demande
 
 
@@ -183,13 +183,13 @@ def update_demande_tourisme_statut(
 ):
     db_demande = crud_demande_tourisme.get_demande_tourisme(db, demande_id)
     if not db_demande:
-        raise HTTPException(status_code=404, detail="Demande tourisme non trouvee")
+        raise HTTPException(status_code=404, detail="Demande tourisme non trouvée")
     if db_demande.statut != "nouvelle" or payload.statut != "contactee":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
                 "L'utilisateur peut uniquement faire passer une nouvelle demande "
-                "au statut contactee. Les statuts suivants sont pilotes par les offres."
+                "au statut contactée. Les statuts suivants sont pilotés par les offres."
             ),
         )
 
@@ -214,7 +214,7 @@ def update_demande_tourisme(
 ):
     db_demande = crud_demande_tourisme.get_demande_tourisme(db, demande_id)
     if not db_demande:
-        raise HTTPException(status_code=404, detail="Demande tourisme non trouvee")
+        raise HTTPException(status_code=404, detail="Demande tourisme non trouvée")
 
     updates = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
     updates["statut"] = db_demande.statut
@@ -232,7 +232,7 @@ def get_historique_demande_tourisme(
 ):
     db_demande = crud_demande_tourisme.get_demande_tourisme(db, demande_id)
     if not db_demande:
-        raise HTTPException(status_code=404, detail="Demande tourisme non trouvee")
+        raise HTTPException(status_code=404, detail="Demande tourisme non trouvée")
     return crud_demande_tourisme.get_historique_demande_tourisme(db, demande_id)
 
 
@@ -245,7 +245,7 @@ def delete_demande_tourisme(
     _ensure_can_delete_demande(current_user)
     db_demande = crud_demande_tourisme.get_demande_tourisme(db, demande_id)
     if not db_demande:
-        raise HTTPException(status_code=404, detail="Demande tourisme non trouvee")
+        raise HTTPException(status_code=404, detail="Demande tourisme non trouvée")
     crud_demande_tourisme.delete_demande_tourisme(db, db_demande)
 
 
@@ -266,7 +266,7 @@ def create_demande_tourisme(payload: DemandeTourismeCreate, db: Session = Depend
             sender_name=f"{db_demande.prenom} {db_demande.nom}",
         )
     except Exception as exc:
-        print(f"Echec de l'envoi de l'email pour la demande tourisme {db_demande.id}: {exc}")
+        print(f"Échec de l'envoi de l'email pour la demande tourisme {db_demande.id}: {exc}")
     return db_demande
 
 
@@ -287,7 +287,7 @@ def create_demande_tourisme_internal(
 @router.post("/custom", response_model=DemandeTourismeCustom, status_code=status.HTTP_201_CREATED)
 def create_demande_tourisme_custom(payload: dict, db: Session = Depends(get_db)):
     if not (payload.get("prenom") or payload.get("prenoms") or payload.get("prenoms_client")):
-        raise HTTPException(status_code=422, detail="Le champ prenom/prenoms est requis")
+        raise HTTPException(status_code=422, detail="Le champ prénom/prénoms est requis")
 
     missing_fields = []
     if not (payload.get("nom") or payload.get("nom_client")):
@@ -318,7 +318,7 @@ def create_demande_tourisme_custom(payload: dict, db: Session = Depends(get_db))
             sender_name=f"{db_demande.prenoms_client} {db_demande.nom_client}",
         )
     except Exception as exc:
-        print(f"Echec de l'envoi de l'email pour la demande tourisme custom {db_demande.id}: {exc}")
+        print(f"Échec de l'envoi de l'email pour la demande tourisme custom {db_demande.id}: {exc}")
     return db_demande
 
 
@@ -329,7 +329,7 @@ def create_demande_tourisme_custom_internal(
     current_user=Depends(require_module_access("tourisme")),
 ):
     if not (payload.get("prenom") or payload.get("prenoms") or payload.get("prenoms_client")):
-        raise HTTPException(status_code=422, detail="Le champ prenom/prenoms est requis")
+        raise HTTPException(status_code=422, detail="Le champ prénom/prénoms est requis")
 
     missing_fields = []
     if not (payload.get("nom") or payload.get("nom_client")):

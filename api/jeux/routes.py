@@ -33,11 +33,11 @@ def _validate_materiels_requis(db: Session, materiels: list) -> None:
 
         db_materiel = crud_materiel.get_materiel(db, materiel_id)
         if not db_materiel:
-            raise HTTPException(status_code=404, detail="Materiel non trouve")
+            raise HTTPException(status_code=404, detail="Matériel non trouvé")
         if db_materiel.statut is False:
             raise HTTPException(
                 status_code=400,
-                detail=f"Materiel inactif: {db_materiel.nom} ne peut pas etre requis pour un jeu",
+                detail=f"Matériel inactif: {db_materiel.nom} ne peut pas être requis pour un jeu",
             )
 
         stock_total = int(db_materiel.quantite_disponible or 0)
@@ -45,8 +45,8 @@ def _validate_materiels_requis(db: Session, materiels: list) -> None:
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    f"Quantite requise trop elevee pour {db_materiel.nom}: "
-                    f"{stock_total} unite(s) en stock total"
+                    f"Quantité requise trop élevée pour {db_materiel.nom}: "
+                    f"{stock_total} unité(s) en stock total"
                 ),
             )
 

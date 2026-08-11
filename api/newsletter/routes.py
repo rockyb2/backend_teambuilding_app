@@ -117,7 +117,7 @@ def create_newsletter_subscription(
     validated_payload = _build_newsletter_payload(payload)
     existing_subscription = crud_newsletter.get_newsletter_subscription_by_email(db, validated_payload.email)
     if existing_subscription:
-        raise HTTPException(status_code=400, detail="Cet email est deja inscrit a la newsletter")
+        raise HTTPException(status_code=400, detail="Cet email est déjà inscrit à la newsletter")
 
     db_subscription = crud_newsletter.create_newsletter_subscription(db, validated_payload)
     if "actif" in payload:
@@ -137,7 +137,7 @@ def get_newsletter_subscription(
 ):
     db_subscription = crud_newsletter.get_newsletter_subscription(db, subscription_id)
     if not db_subscription:
-        raise HTTPException(status_code=404, detail="Inscription newsletter non trouvee")
+        raise HTTPException(status_code=404, detail="Inscription newsletter non trouvée")
     return db_subscription
 
 
@@ -150,13 +150,13 @@ def update_newsletter_subscription(
 ):
     db_subscription = crud_newsletter.get_newsletter_subscription(db, subscription_id)
     if not db_subscription:
-        raise HTTPException(status_code=404, detail="Inscription newsletter non trouvee")
+        raise HTTPException(status_code=404, detail="Inscription newsletter non trouvée")
 
     validated_payload = _build_newsletter_update_payload(payload)
     if validated_payload.email and validated_payload.email != db_subscription.email:
         existing_subscription = crud_newsletter.get_newsletter_subscription_by_email(db, validated_payload.email)
         if existing_subscription:
-            raise HTTPException(status_code=400, detail="Cet email est deja inscrit a la newsletter")
+            raise HTTPException(status_code=400, detail="Cet email est déjà inscrit à la newsletter")
 
     return crud_newsletter.update_newsletter_subscription(db, db_subscription, validated_payload)
 
@@ -169,6 +169,6 @@ def delete_newsletter_subscription(
 ):
     db_subscription = crud_newsletter.get_newsletter_subscription(db, subscription_id)
     if not db_subscription:
-        raise HTTPException(status_code=404, detail="Inscription newsletter non trouvee")
+        raise HTTPException(status_code=404, detail="Inscription newsletter non trouvée")
 
     crud_newsletter.delete_newsletter_subscription(db, db_subscription)

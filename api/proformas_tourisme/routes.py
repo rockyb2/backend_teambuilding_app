@@ -31,7 +31,7 @@ def _payload_dump(payload, **kwargs):
 def _get_tourism_proforma_or_404(db: Session, proforma_id: int):
     db_proforma = crud_proforma.get_proforma(db, proforma_id)
     if not db_proforma or db_proforma.pole != "tourisme":
-        raise HTTPException(status_code=404, detail="Proforma tourisme non trouvee")
+        raise HTTPException(status_code=404, detail="Proforma tourisme non trouvée")
     return db_proforma
 
 
@@ -39,7 +39,7 @@ def _validate_tourism_context(db: Session, values: dict) -> dict:
     if values.get("demande_team_building_id") or values.get("offre_id"):
         raise HTTPException(
             status_code=422,
-            detail="Une proforma tourisme ne peut pas etre liee a une demande ou offre team building",
+            detail="Une proforma tourisme ne peut pas être liée à une demande ou offre team building",
         )
 
     values["pole"] = "tourisme"
@@ -50,17 +50,17 @@ def _validate_tourism_context(db: Session, values: dict) -> dict:
     if offre_tourisme_id:
         offre = crud_offre_tourisme.get_offre_tourisme(db, offre_tourisme_id)
         if not offre:
-            raise HTTPException(status_code=404, detail="Offre tourisme non trouvee")
+            raise HTTPException(status_code=404, detail="Offre tourisme non trouvée")
 
         demande_tourisme_id = values.get("demande_tourisme_id")
         demande_tourisme_custom_id = values.get("demande_tourisme_custom_id")
         if demande_tourisme_id and demande_tourisme_id != offre.demande_tourisme_id:
-            raise HTTPException(status_code=422, detail="La demande ne correspond pas a l'offre tourisme")
+            raise HTTPException(status_code=422, detail="La demande ne correspond pas à l'offre tourisme")
         if (
             demande_tourisme_custom_id
             and demande_tourisme_custom_id != offre.demande_tourisme_custom_id
         ):
-            raise HTTPException(status_code=422, detail="La demande ne correspond pas a l'offre tourisme")
+            raise HTTPException(status_code=422, detail="La demande ne correspond pas à l'offre tourisme")
 
         values["demande_tourisme_id"] = offre.demande_tourisme_id
         values["demande_tourisme_custom_id"] = offre.demande_tourisme_custom_id
@@ -71,16 +71,16 @@ def _validate_tourism_context(db: Session, values: dict) -> dict:
     if (demande_tourisme_id is None) == (demande_tourisme_custom_id is None):
         raise HTTPException(
             status_code=422,
-            detail="Une proforma tourisme doit etre liee a une seule demande tourisme ou a une offre",
+            detail="Une proforma tourisme doit être liée à une seule demande tourisme ou à une offre",
         )
 
     if demande_tourisme_id is not None:
         if not crud_demande_tourisme.get_demande_tourisme(db, demande_tourisme_id):
-            raise HTTPException(status_code=404, detail="Demande tourisme non trouvee")
+            raise HTTPException(status_code=404, detail="Demande tourisme non trouvée")
         return values
 
     if not crud_demande_tourisme.get_demande_tourisme_custom(db, demande_tourisme_custom_id):
-        raise HTTPException(status_code=404, detail="Demande tourisme personnalisee non trouvee")
+        raise HTTPException(status_code=404, detail="Demande tourisme personnalisée non trouvée")
     return values
 
 
@@ -133,7 +133,7 @@ def create_proforma_tourisme_from_offre(
 ):
     offre = crud_offre_tourisme.get_offre_tourisme(db, offre_id)
     if not offre:
-        raise HTTPException(status_code=404, detail="Offre tourisme non trouvee")
+        raise HTTPException(status_code=404, detail="Offre tourisme non trouvée")
     try:
         return crud_proforma.create_tourism_proforma_from_offer(
             db,
@@ -148,7 +148,7 @@ def create_proforma_tourisme_from_offre(
 def generate_pdf_tourisme(proforma_id: int, db: Session = Depends(get_db)):
     db_proforma = _get_tourism_proforma_or_404(db, proforma_id)
     if db_proforma.statut == "annulee":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Proforma annulee")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Proforma annulée")
     try:
         return crud_proforma.generate_pdf_for_proforma(db, db_proforma)
     except ValueError as exc:
@@ -160,7 +160,7 @@ def download_pdf_tourisme(proforma_id: int, db: Session = Depends(get_db)):
     db_proforma = _get_tourism_proforma_or_404(db, proforma_id)
     pdf_path = crud_proforma.get_pdf_path(db_proforma)
     if not pdf_path or not pdf_path.exists() or not pdf_path.is_file():
-        raise HTTPException(status_code=404, detail="PDF non genere")
+        raise HTTPException(status_code=404, detail="PDF non généré")
     return FileResponse(
         path=Path(pdf_path),
         media_type="application/pdf",

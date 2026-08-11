@@ -161,7 +161,7 @@ def get_circuit_touristique(
 ):
     db_circuit = crud_circuit.get_circuit_touristique(db, circuit_id)
     if not db_circuit:
-        raise HTTPException(status_code=404, detail="Circuit touristique non trouve")
+        raise HTTPException(status_code=404, detail="Circuit touristique non trouvé")
     return _serialize_circuit(db_circuit, lang=lang)
 
 
@@ -190,7 +190,7 @@ def update_circuit_touristique(
 ):
     db_circuit = crud_circuit.get_circuit_touristique(db, circuit_id)
     if not db_circuit:
-        raise HTTPException(status_code=404, detail="Circuit touristique non trouve")
+        raise HTTPException(status_code=404, detail="Circuit touristique non trouvé")
 
     db_circuit = crud_circuit.update_circuit_touristique(
         db,
@@ -209,5 +209,5 @@ def delete_circuit_touristique(
 ):
     db_circuit = crud_circuit.get_circuit_touristique(db, circuit_id)
     if not db_circuit:
-        raise HTTPException(status_code=404, detail="Circuit touristique non trouve")
+        raise HTTPException(status_code=404, detail="Circuit touristique non trouvé")
     crud_circuit.delete_circuit_touristique(db, db_circuit)

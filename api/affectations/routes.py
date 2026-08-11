@@ -31,7 +31,7 @@ def get_affectations(skip: int = 0, limit: int = 100, db: Session = Depends(get_
 def get_affectations_by_activite(activite_id: int, db: Session = Depends(get_db)):
     """Recuperer les affectations d'une activite."""
     if not crud_activite.get_activite(db, activite_id):
-        raise HTTPException(status_code=404, detail="Activite non trouvee")
+        raise HTTPException(status_code=404, detail="Activité non trouvée")
 
     return crud_affectation.get_affectations_by_activite(db, activite_id)
 
@@ -40,7 +40,7 @@ def get_affectations_by_activite(activite_id: int, db: Session = Depends(get_db)
 def get_affectations_by_personnel(personnel_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Recuperer les affectations d'un membre du personnel."""
     if not crud_personnel.get_personnel(db, personnel_id):
-        raise HTTPException(status_code=404, detail="Personnel non trouve")
+        raise HTTPException(status_code=404, detail="Personnel non trouvé")
 
     return crud_affectation.get_affectations_by_personnel(db, personnel_id, skip=skip, limit=limit)
 
@@ -50,7 +50,7 @@ def get_affectation(affectation_id: int, db: Session = Depends(get_db)):
     """Recuperer une affectation par ID."""
     db_affectation = crud_affectation.get_affectation(db, affectation_id)
     if not db_affectation:
-        raise HTTPException(status_code=404, detail="Affectation non trouvee")
+        raise HTTPException(status_code=404, detail="Affectation non trouvée")
     return db_affectation
 
 
@@ -58,14 +58,14 @@ def get_affectation(affectation_id: int, db: Session = Depends(get_db)):
 def create_affectation(payload: AffectationCreate, db: Session = Depends(get_db)):
     """Creer une nouvelle affectation."""
     if not crud_activite.get_activite(db, payload.activite_id):
-        raise HTTPException(status_code=404, detail="Activite non trouvee")
+        raise HTTPException(status_code=404, detail="Activité non trouvée")
 
     if not crud_personnel.get_personnel(db, payload.personnel_id):
-        raise HTTPException(status_code=404, detail="Personnel non trouve")
+        raise HTTPException(status_code=404, detail="Personnel non trouvé")
 
     existing = crud_affectation.get_affectation_by_pair(db, payload.activite_id, payload.personnel_id)
     if existing:
-        raise HTTPException(status_code=409, detail="Ce membre du personnel est deja affecte a cette activite")
+        raise HTTPException(status_code=409, detail="Ce membre du personnel est déjà affecté à cette activité")
 
     return crud_affectation.create_affectation(db, payload)
 
@@ -75,7 +75,7 @@ def update_affectation(affectation_id: int, payload: dict, db: Session = Depends
     """Mettre a jour une affectation."""
     db_affectation = crud_affectation.get_affectation(db, affectation_id)
     if not db_affectation:
-        raise HTTPException(status_code=404, detail="Affectation non trouvee")
+        raise HTTPException(status_code=404, detail="Affectation non trouvée")
 
     return crud_affectation.update_affectation(db, db_affectation, payload)
 
@@ -85,6 +85,6 @@ def delete_affectation(affectation_id: int, db: Session = Depends(get_db)):
     """Supprimer une affectation."""
     db_affectation = crud_affectation.get_affectation(db, affectation_id)
     if not db_affectation:
-        raise HTTPException(status_code=404, detail="Affectation non trouvee")
+        raise HTTPException(status_code=404, detail="Affectation non trouvée")
 
     crud_affectation.delete_affectation(db, db_affectation)
