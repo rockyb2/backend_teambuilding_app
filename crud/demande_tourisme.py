@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -21,10 +21,12 @@ def _model_dump(schema_obj, **kwargs):
     return schema_obj.dict(**kwargs)
 
 
-def _normalize_custom_tourism_payload(payload) -> dict:
+def _normalize_custom_tourism_payload(payload, *, default_date: bool = True) -> dict:
     data = _model_dump(payload) if not isinstance(payload, dict) else dict(payload)
+    date_demande = data.get("date_demande")
 
-    return {
+    normalized = {
+        "date_demande": date_demande or (date.today() if default_date else None),
         "nom_client": data.get("nom") or data.get("nom_client"),
         "prenoms_client": data.get("prenom") or data.get("prenoms") or data.get("prenoms_client"),
         "email_client": data.get("email") or data.get("email_client"),
@@ -36,10 +38,16 @@ def _normalize_custom_tourism_payload(payload) -> dict:
             or 1
         ),
         "nombre_jours": data.get("nb_jours") or data.get("nombre_jours"),
+        "date_depart_souhaitee": data.get("date_depart_souhaitee"),
         "lieu_souhaite": data.get("lieu_souhaite"),
         "attente_voyage": data.get("attente_voyage"),
         "statut": data.get("statut") or "nouvelle",
     }
+
+    if not default_date and not normalized["date_demande"]:
+        normalized.pop("date_demande")
+
+    return normalized
 
 
 def get_demande_tourisme(db: Session, demande_id: int) -> Optional[DemandeTourisme]:
@@ -55,7 +63,7 @@ def get_demande_tourisme_custom(
 def get_demandes_tourisme(db: Session, skip: int = 0, limit: int = 100) -> list[DemandeTourisme]:
     return (
         db.query(DemandeTourisme)
-        .order_by(DemandeTourisme.created_at.desc())
+        .order_by(DemandeTourisme.date_demande.desc(), DemandeTourisme.created_at.desc())
         .offset(skip)
         .limit(limit)
         .all()
@@ -67,7 +75,7 @@ def get_demandes_tourisme_custom(
 ) -> list[DemandeTourismeCustom]:
     return (
         db.query(DemandeTourismeCustom)
-        .order_by(DemandeTourismeCustom.created_at.desc())
+        .order_by(DemandeTourismeCustom.date_demande.desc(), DemandeTourismeCustom.created_at.desc())
         .offset(skip)
         .limit(limit)
         .all()
@@ -81,6 +89,7 @@ def create_demande_tourisme(
     created_by_id: int | None = None,
 ) -> DemandeTourisme:
     data = _model_dump(payload)
+    data["date_demande"] = data.get("date_demande") or date.today()
     data["source"] = source
     data["created_by_id"] = created_by_id
     db_demande = DemandeTourisme(**data)
@@ -96,6 +105,8 @@ def update_demande_tourisme(
     payload: DemandeTourismeCreate | dict,
 ) -> DemandeTourisme:
     data = _model_dump(payload, exclude_unset=True) if not isinstance(payload, dict) else dict(payload)
+    if not data.get("date_demande"):
+        data.pop("date_demande", None)
 
     for key, value in data.items():
         if hasattr(db_demande, key):
@@ -130,7 +141,7 @@ def update_demande_tourisme_custom(
     payload: DemandeTourismeCustumerCreate | dict,
     updated_by_id: int | None = None,
 ) -> DemandeTourismeCustom:
-    data = _normalize_custom_tourism_payload(payload)
+    data = _normalize_custom_tourism_payload(payload, default_date=False)
 
     for key, value in data.items():
         if hasattr(db_demande, key):

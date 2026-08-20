@@ -1096,6 +1096,7 @@ class DemandeTourisme(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
+    date_demande = Column(Date, nullable=False, server_default=func.current_date())
     circuit_externe_id = Column(Integer, nullable=True)
     titre_circuit = Column(String(255), nullable=False)
     lieu_circuit = Column(String(255), nullable=True)
@@ -1157,12 +1158,14 @@ class DemandeTourismeCustom(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
+    date_demande = Column(Date, nullable=False, server_default=func.current_date())
     nom_client = Column(String(255), nullable=False)
     prenoms_client = Column(String(255), nullable=False)
     email_client = Column(String(255), nullable=False, index=True)
-    numero_telephone_client = Column(String(50), nullable=False)
+    numero_telephone_client = Column(String(50), nullable=True)
     nombre_personne = Column(Integer, nullable=False, default=1, server_default=text("1"))
     nombre_jours = Column(Integer, nullable=True)
+    date_depart_souhaitee = Column(Date, nullable=True)
     lieu_souhaite = Column(String(255), nullable=True)
     attente_voyage = Column(Text, nullable=True)
     source = Column(String(30), nullable=False, default="site_web", server_default=text("'site_web'"))
@@ -1212,7 +1215,7 @@ class DemandeTourismeCustom(Base):
         return self.email_client
 
     @property
-    def telephone(self) -> str:
+    def telephone(self) -> str | None:
         return self.numero_telephone_client
 
     @property

@@ -173,6 +173,47 @@ def _synchronize_demande_tourisme_status_constraints(connection):
         )
 
 
+def _synchronize_tourism_request_columns(connection):
+    if connection.dialect.name != "postgresql":
+        return
+
+    for table_name in ("demandes_tourisme", "demandes_tourisme_custom"):
+        connection.execute(
+            text(
+                f"""
+                UPDATE public.{table_name}
+                SET date_demande = COALESCE(date_demande, created_at::date, CURRENT_DATE)
+                WHERE date_demande IS NULL
+                """
+            )
+        )
+        connection.execute(
+            text(
+                f"""
+                ALTER TABLE public.{table_name}
+                ALTER COLUMN date_demande SET DEFAULT CURRENT_DATE
+                """
+            )
+        )
+        connection.execute(
+            text(
+                f"""
+                ALTER TABLE public.{table_name}
+                ALTER COLUMN date_demande SET NOT NULL
+                """
+            )
+        )
+
+    connection.execute(
+        text(
+            """
+            ALTER TABLE public.demandes_tourisme_custom
+            ALTER COLUMN numero_telephone_client DROP NOT NULL
+            """
+        )
+    )
+
+
 def _synchronize_proforma_constraints(connection):
     if connection.dialect.name != "postgresql":
         return
@@ -290,9 +331,14 @@ def create_tables():
             ),
         },
         "demandes_tourisme": {
+            "date_demande": "DATE NULL",
             "created_by_id": (
                 "INTEGER NULL REFERENCES utilisateur(id_utilisateur) ON DELETE SET NULL"
             ),
+        },
+        "demandes_tourisme_custom": {
+            "date_demande": "DATE NULL",
+            "date_depart_souhaitee": "DATE NULL",
         },
         "proformas": {
             "pole": "VARCHAR(30) NOT NULL DEFAULT 'teambuilding'",
@@ -348,5 +394,6 @@ def create_tables():
 
         _synchronize_offre_status_constraint(connection)
         _synchronize_demande_tourisme_status_constraints(connection)
+        _synchronize_tourism_request_columns(connection)
         _synchronize_proforma_constraints(connection)
         _synchronize_depense_constraints(connection)

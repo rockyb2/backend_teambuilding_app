@@ -294,8 +294,6 @@ def create_demande_tourisme_custom(payload: dict, db: Session = Depends(get_db))
         missing_fields.append("nom")
     if not (payload.get("email") or payload.get("email_client")):
         missing_fields.append("email")
-    if not (payload.get("telephone") or payload.get("numero_telephone_client")):
-        missing_fields.append("telephone")
 
     if missing_fields:
         raise HTTPException(
@@ -336,8 +334,6 @@ def create_demande_tourisme_custom_internal(
         missing_fields.append("nom")
     if not (payload.get("email") or payload.get("email_client")):
         missing_fields.append("email")
-    if not (payload.get("telephone") or payload.get("numero_telephone_client")):
-        missing_fields.append("telephone")
 
     if missing_fields:
         raise HTTPException(

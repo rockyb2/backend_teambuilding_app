@@ -181,6 +181,8 @@ def _tourisme_people_count(demande: DemandeTourisme | DemandeTourismeCustom | No
 def _tourisme_event_date(demande: DemandeTourisme | DemandeTourismeCustom | None):
     if isinstance(demande, DemandeTourisme):
         return demande.date_depart_souhaitee
+    if isinstance(demande, DemandeTourismeCustom):
+        return demande.date_depart_souhaitee
     return None
 
 

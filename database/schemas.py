@@ -770,6 +770,7 @@ class DepenseRead(DepenseBase):
 
 
 class DemandeTourismeBase(ORMBaseModel):
+    date_demande: Optional[date] = None
     circuit_externe_id: Optional[int] = None
     titre_circuit: str
     lieu_circuit: Optional[str] = None
@@ -1133,12 +1134,14 @@ class RefreshTokenResponse(ORMBaseModel):
 
 
 class DemandeTourismeCustumerBase(ORMBaseModel):
+    date_demande: Optional[date] = None
     prenom: str
     nom: str
     email: str
     telephone: Optional[str] = None
     nb_personnes: int = 1
     nb_jours: Optional[int] = None
+    date_depart_souhaitee: Optional[date] = None
     lieu_souhaite: Optional[str] = None
     attente_voyage: Optional[str] = None
     source: Optional[str] = "site_web"
