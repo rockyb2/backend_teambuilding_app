@@ -2,6 +2,8 @@
 Routes pour la gestion des utilisateurs.
 """
 
+import secrets
+import string
 from datetime import timedelta
 from typing import List
 
@@ -14,6 +16,7 @@ from database.schemas import (
     AuthUserResponse,
     LoginRequest,
     LoginResponse,
+    PasswordResetRequest,
     RefreshTokenRequest,
     RefreshTokenResponse,
     RoleRead,
@@ -35,10 +38,26 @@ from security import (
     normalize_role_name,
     require_role_management_access,
     require_user_management_access,
+    get_password_hash,
 )
-from services.email_service import send_user_access_email
+from services.email_service import send_password_reset_email, send_user_access_email
 
 router = APIRouter(prefix="/api/utilisateurs", tags=["utilisateurs"])
+PASSWORD_RESET_MESSAGE = (
+    "Si un compte correspond à cet email, un mot de passe temporaire vient d'être envoyé."
+)
+
+
+def _generate_temporary_password(length: int = 12) -> str:
+    alphabet = string.ascii_letters + string.digits
+    while True:
+        password = "".join(secrets.choice(alphabet) for _ in range(length))
+        if (
+            any(char.islower() for char in password)
+            and any(char.isupper() for char in password)
+            and any(char.isdigit() for char in password)
+        ):
+            return password
 
 
 def _send_access_email_safely(utilisateur, plain_password: str) -> None:
@@ -251,6 +270,31 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         "token_type": "bearer",
         "user": _auth_user_response(utilisateur),
     }
+
+
+@router.post("/auth/forgot-password")
+def forgot_password(payload: PasswordResetRequest, db: Session = Depends(get_db)):
+    email = payload.email.strip().lower()
+    utilisateur = crud_utilisateur.get_utilisateur_by_email(db, email)
+    if not utilisateur or not getattr(utilisateur, "actif", True):
+        return {"message": PASSWORD_RESET_MESSAGE}
+
+    temporary_password = _generate_temporary_password()
+    try:
+        utilisateur.mot_de_passe = get_password_hash(temporary_password)
+        sent = send_password_reset_email(utilisateur, temporary_password)
+        if not sent:
+            db.rollback()
+            print(f"SMTP désactivé: mot de passe temporaire non envoyé à {utilisateur.email}")
+            return {"message": PASSWORD_RESET_MESSAGE}
+
+        db.commit()
+        db.refresh(utilisateur)
+    except Exception as exc:
+        db.rollback()
+        print(f"Echec réinitialisation mot de passe utilisateur {utilisateur.id_utilisateur}: {exc}")
+
+    return {"message": PASSWORD_RESET_MESSAGE}
 
 
 @router.post("/auth/refresh", response_model=RefreshTokenResponse)

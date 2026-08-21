@@ -673,6 +673,7 @@ class DemandeTeamBuilding(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
+    date_demande = Column(Date, nullable=False, server_default=func.current_date())
     entreprise = Column(String(255), nullable=False)
     nom_contact = Column(String(255), nullable=False)
     fonction_contact = Column(String(150), nullable=True)

@@ -214,6 +214,45 @@ def _synchronize_tourism_request_columns(connection):
     )
 
 
+def _synchronize_team_building_request_columns(connection):
+    if connection.dialect.name != "postgresql":
+        return
+
+    connection.execute(
+        text(
+            """
+            UPDATE public.demandes_team_building
+            SET date_demande = COALESCE(date_demande, created_at::date, CURRENT_DATE)
+            WHERE date_demande IS NULL
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE public.demandes_team_building
+            ALTER COLUMN date_demande SET DEFAULT CURRENT_DATE
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            ALTER TABLE public.demandes_team_building
+            ALTER COLUMN date_demande SET NOT NULL
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS ix_demandes_team_building_date_demande
+            ON public.demandes_team_building (date_demande)
+            """
+        )
+    )
+
+
 def _synchronize_proforma_constraints(connection):
     if connection.dialect.name != "postgresql":
         return
@@ -322,6 +361,7 @@ def create_tables():
             "derniere_connexion": "TIMESTAMP WITH TIME ZONE NULL",
         },
         "demandes_team_building": {
+            "date_demande": "DATE NULL",
             "statut_modifie_le": "TIMESTAMP WITH TIME ZONE NULL",
             "statut_modifie_par_id": (
                 "INTEGER NULL REFERENCES utilisateur(id_utilisateur) ON DELETE SET NULL"
@@ -393,6 +433,7 @@ def create_tables():
                 )
 
         _synchronize_offre_status_constraint(connection)
+        _synchronize_team_building_request_columns(connection)
         _synchronize_demande_tourisme_status_constraints(connection)
         _synchronize_tourism_request_columns(connection)
         _synchronize_proforma_constraints(connection)

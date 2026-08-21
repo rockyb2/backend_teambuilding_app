@@ -899,6 +899,7 @@ class DemandeTeamBuildingCadreRead(DemandeTeamBuildingCadreBase):
 
 
 class DemandeTeamBuildingBase(ORMBaseModel):
+    date_demande: Optional[date] = None
     entreprise: str
     nom_contact: str
     fonction_contact: Optional[str] = None
@@ -1097,6 +1098,10 @@ class UtilisateurPasswordChange(ORMBaseModel):
         class Config:
             orm_mode = True
             extra = "forbid"
+
+
+class PasswordResetRequest(ORMBaseModel):
+    email: str = Field(min_length=3, max_length=150)
 
 
 class LoginRequest(ORMBaseModel):

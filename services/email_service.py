@@ -199,6 +199,50 @@ def send_user_access_email(utilisateur, password: str) -> bool:
     return True
 
 
+def build_password_reset_email(utilisateur, password: str) -> tuple[str, str, str]:
+    full_name = " ".join(
+        value.strip()
+        for value in (getattr(utilisateur, "prenom", None), getattr(utilisateur, "nom", None))
+        if value and value.strip()
+    ) or getattr(utilisateur, "email", "")
+    login_url = _get_crm_login_url()
+    rows = [
+        ("Email de connexion", getattr(utilisateur, "email", "")),
+        ("Mot de passe temporaire", password),
+        ("Lien CRM", login_url),
+        ("Securite", "Connectez-vous puis modifiez ce mot de passe depuis votre profil."),
+    ]
+    subject = "Réinitialisation de votre mot de passe CRM IvoirTrips"
+    body = (
+        f"Bonjour {full_name},\n\n"
+        "Une demande de réinitialisation de mot de passe a ete effectuee pour votre compte CRM.\n\n"
+        + "\n".join(f"{label} : {_normalize_value(value)}" for label, value in rows)
+        + "\n\nSi vous n'etes pas a l'origine de cette demande, contactez votre administrateur."
+    )
+    html_body = _render_email_html(
+        title="Mot de passe réinitialisé",
+        subtitle="Utilisez le mot de passe temporaire ci-dessous pour vous reconnecter au CRM.",
+        badge="Mot de passe oublie",
+        rows=rows,
+        accent="#ea580c",
+    )
+    return subject, body, html_body
+
+
+def send_password_reset_email(utilisateur, password: str) -> bool:
+    if not is_email_enabled():
+        return False
+
+    subject, body, html_body = build_password_reset_email(utilisateur, password)
+    send_email(
+        subject=subject,
+        body=body,
+        html_body=html_body,
+        to_emails=[getattr(utilisateur, "email", "")],
+    )
+    return True
+
+
 def _normalize_value(value) -> str:
     if value is None:
         return "Non précisé"

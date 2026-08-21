@@ -80,6 +80,12 @@ def _activity_readiness(activity: Activite) -> tuple[str, list[str]]:
     return "À compléter", missing
 
 
+def _request_date(request: DemandeTeamBuilding) -> date:
+    if request.date_demande:
+        return request.date_demande
+    return request.created_at.date()
+
+
 def _upcoming_activities(db: Session, now: datetime) -> list[Activite]:
     return (
         db.query(Activite)
@@ -113,7 +119,7 @@ def _build_priorities(
     new_requests = (
         db.query(DemandeTeamBuilding)
         .filter(DemandeTeamBuilding.statut == "nouvelle")
-        .order_by(DemandeTeamBuilding.created_at.asc())
+        .order_by(DemandeTeamBuilding.date_demande.asc(), DemandeTeamBuilding.created_at.asc())
         .limit(4)
         .all()
     )
@@ -259,7 +265,7 @@ def get_dashboard(db: Session) -> dict:
     )
     monthly_requests = (
         db.query(DemandeTeamBuilding)
-        .filter(DemandeTeamBuilding.created_at >= month_start)
+        .filter(DemandeTeamBuilding.date_demande >= month_buckets[0]["start"])
         .all()
     )
     monthly_activity = []
@@ -288,13 +294,13 @@ def get_dashboard(db: Session) -> dict:
         received = sum(
             1
             for request in monthly_requests
-            if bucket["start"] <= request.created_at.date() < bucket["end"]
+            if bucket["start"] <= _request_date(request) < bucket["end"]
         )
         confirmed = sum(
             1
             for request in monthly_requests
             if request.statut == "confirmee"
-            and bucket["start"] <= request.created_at.date() < bucket["end"]
+            and bucket["start"] <= _request_date(request) < bucket["end"]
         )
         monthly_requests_summary.append(
             {
@@ -358,7 +364,7 @@ def get_dashboard(db: Session) -> dict:
 
     recent_requests = (
         db.query(DemandeTeamBuilding)
-        .order_by(DemandeTeamBuilding.created_at.desc())
+        .order_by(DemandeTeamBuilding.date_demande.desc(), DemandeTeamBuilding.created_at.desc())
         .limit(6)
         .all()
     )
@@ -388,6 +394,7 @@ def get_dashboard(db: Session) -> dict:
                 "participants": request.nombre_participants,
                 "objectif": request.objectif,
                 "statut": request.statut,
+                "date_demande": request.date_demande,
                 "created_at": request.created_at,
             }
             for request in recent_requests

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session, selectinload
@@ -28,7 +28,7 @@ def get_demandes_team_building(
     return (
         db.query(DemandeTeamBuilding)
         .options(selectinload(DemandeTeamBuilding.cadres))
-        .order_by(DemandeTeamBuilding.created_at.desc())
+        .order_by(DemandeTeamBuilding.date_demande.desc(), DemandeTeamBuilding.created_at.desc())
         .offset(skip)
         .limit(limit)
         .all()
@@ -43,6 +43,7 @@ def create_demande_team_building(
 ) -> DemandeTeamBuilding:
     data = _model_dump(payload)
     cadres = data.pop("cadres", [])
+    data["date_demande"] = data.get("date_demande") or date.today()
     data["source"] = source
     data["created_by_id"] = created_by_id
 
@@ -63,6 +64,8 @@ def update_demande_team_building(
 ) -> DemandeTeamBuilding:
     data = _model_dump(payload, exclude_unset=True) if not isinstance(payload, dict) else dict(payload)
     cadres = data.pop("cadres", None)
+    if not data.get("date_demande"):
+        data.pop("date_demande", None)
 
     for key, value in data.items():
         if hasattr(db_demande, key):
