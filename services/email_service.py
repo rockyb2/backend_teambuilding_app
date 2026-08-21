@@ -166,19 +166,19 @@ def build_user_access_email(utilisateur, password: str) -> tuple[str, str, str]:
         ("Email de connexion", getattr(utilisateur, "email", "")),
         ("Mot de passe", password),
         ("Lien CRM", login_url),
-        ("Securite", "Modifiez votre mot de passe apres votre premiere connexion."),
+        ("Securite", "Modifiez votre mot de passe après votre première connexion."),
     ]
-    subject = "Vos acces au CRM IvoirTrips"
+    subject = "Vos accès au CRM IvoirTrips"
     body = (
         f"Bonjour {full_name},\n\n"
-        "Votre compte CRM IvoirTrips a ete cree.\n\n"
+        "Votre compte CRM IvoirTrips à été créé.\n\n"
         + "\n".join(f"{label} : {_normalize_value(value)}" for label, value in rows[1:])
-        + "\n\nPour plus de securite, modifiez votre mot de passe apres votre premiere connexion."
+        + "\n\nPour plus de sécurité, modifiez votre mot de passe après votre première connexion."
     )
     html_body = _render_email_html(
-        title="Vos acces au CRM IvoirTrips",
-        subtitle="Votre compte utilisateur est pret. Vous pouvez vous connecter avec les informations ci-dessous.",
-        badge="Acces CRM",
+        title="Vos accès au CRM IvoirTrips",
+        subtitle="Votre compte utilisateur est prêt. Vous pouvez vous connecter avec les informations ci-dessous.",
+        badge="Accès CRM",
         rows=rows,
         accent="#0f766e",
     )
