@@ -10,14 +10,14 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from database.models import DemandeTeamBuilding, Offre, Site
-from services.proforma_pdf import calculate_totals
+from services.proforma_pdf import TEAMBUILDING_AGENCY_FEE_RATE, calculate_totals
 
 
-DEFAULT_PAYMENT_TERMS = "100% a la commande par cheque ou virement bancaire"
+DEFAULT_PAYMENT_TERMS = "100 % à la commande"
 DEFAULT_AGENCY_DETAILS = [
     "Conception du programme",
     "Coordination operationnelle",
-    "Encadrement equipe Ivoir Trips",
+    "Encadrement équipe Ivoir Trips",
 ]
 
 _SESSIONS: dict[str, dict[str, Any]] = {}
@@ -291,8 +291,12 @@ def build_draft(fields: dict[str, Any], recommendations: list[dict[str, Any]]) -
         )
 
     sections = [{"nom": "Logistique et site", "prestations": prestations}]
-    subtotal = int(calculate_totals(sections)["sous_total_ht"])
-    agency_fees = max(150000, int(subtotal * 0.10)) if subtotal else 150000
+    totals = calculate_totals(
+        sections,
+        taux_tva_frais_agence=18,
+        agency_fee_rate=TEAMBUILDING_AGENCY_FEE_RATE,
+    )
+    agency_fees = int(totals["frais_agence"])
 
     draft = {
         "demande_team_building_id": fields.get("demande_team_building_id"),
@@ -312,7 +316,12 @@ def build_draft(fields: dict[str, Any], recommendations: list[dict[str, Any]]) -
         "notes": "Brouillon genere par l'assistant. A verifier avant generation PDF.",
         "statut": "validee",
     }
-    totals = calculate_totals(draft["sections"], draft["frais_agence"], draft["taux_tva_frais_agence"])
+    totals = calculate_totals(
+        draft["sections"],
+        draft["frais_agence"],
+        draft["taux_tva_frais_agence"],
+        agency_fee_rate=TEAMBUILDING_AGENCY_FEE_RATE,
+    )
     draft.update(
         {
             "sous_total_ht": int(totals["sous_total_ht"]),

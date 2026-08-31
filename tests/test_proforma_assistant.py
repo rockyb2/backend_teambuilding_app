@@ -106,6 +106,32 @@ class ProformaAssistantTests(unittest.TestCase):
         self.assertEqual(int(values["tva_frais_agence"]), 36000)
         self.assertEqual(int(values["total_ttc"]), 1236000)
 
+    def test_teambuilding_proforma_agency_fee_is_17_5_percent_of_services(self):
+        values = _prepare_values(
+            {
+                "pole": "teambuilding",
+                "sections": [
+                    {
+                        "nom": "Mise en oeuvre",
+                        "prestations": [
+                            {
+                                "designation": "Dispositif team building",
+                                "quantite": 1,
+                                "prix_unitaire": 50760000,
+                            }
+                        ],
+                    }
+                ],
+                "frais_agence": 0,
+                "taux_tva_frais_agence": 18,
+            }
+        )
+
+        self.assertEqual(int(values["sous_total_ht"]), 50760000)
+        self.assertEqual(int(values["frais_agence"]), 8883000)
+        self.assertEqual(int(values["tva_frais_agence"]), 1598940)
+        self.assertEqual(int(values["total_ttc"]), 61241940)
+
     def test_generate_pdf_creates_file(self):
         data = {
             "reference": "PRO-2026-0001",

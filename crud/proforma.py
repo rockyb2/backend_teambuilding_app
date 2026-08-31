@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 
@@ -10,7 +10,12 @@ from sqlalchemy.orm import Session
 
 from database.models import DemandeTourisme, DemandeTourismeCustom, OffreTourisme, Proforma
 from database.schemas import ProformaCreate, ProformaUpdate
-from services.proforma_pdf import BASE_DIR, calculate_totals, generate_proforma_pdf
+from services.proforma_pdf import (
+    BASE_DIR,
+    TEAMBUILDING_AGENCY_FEE_RATE,
+    calculate_totals,
+    generate_proforma_pdf,
+)
 
 
 PROFORMA_REFERENCE_PREFIX = "PRO"
@@ -120,21 +125,21 @@ def _prepare_values(values: dict) -> dict:
     sections = values.get("sections") or []
     vat_rate = values.get("taux_tva_frais_agence") or 18
     agency_fees = values.get("frais_agence") or 0
-
-    if values.get("pole") == "tourisme":
-        tourism_totals = calculate_totals(sections, 0, vat_rate)
-        agency_fees = (tourism_totals["sous_total_ht"] * TOURISM_AGENCY_FEE_RATE).quantize(
-            Decimal("1"),
-            rounding=ROUND_HALF_UP,
-        )
+    agency_fee_rate = None
+    if values.get("pole") == "teambuilding":
+        agency_fee_rate = TEAMBUILDING_AGENCY_FEE_RATE
+    elif values.get("pole") == "tourisme":
+        agency_fee_rate = TOURISM_AGENCY_FEE_RATE
 
     totals = calculate_totals(
         sections,
         agency_fees,
         vat_rate,
+        agency_fee_rate=agency_fee_rate,
     )
     values["sections"] = totals["sections"]
     values["frais_agence"] = totals["frais_agence"]
+    values["taux_tva_frais_agence"] = totals["taux_tva_frais_agence"]
     values["sous_total_ht"] = totals["sous_total_ht"]
     values["tva_frais_agence"] = totals["tva_frais_agence"]
     values["total_ttc"] = totals["total_ttc"]
@@ -261,6 +266,7 @@ def update_proforma(db: Session, db_proforma: Proforma, payload: ProformaUpdate 
 
 def generate_pdf_for_proforma(db: Session, db_proforma: Proforma) -> Proforma:
     data = {
+        "pole": db_proforma.pole,
         "reference": db_proforma.reference,
         "client": db_proforma.client,
         "nombre_personnes": db_proforma.nombre_personnes,
