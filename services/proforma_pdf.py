@@ -11,9 +11,7 @@ from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.lib.utils import ImageReader
 from reportlab.platypus import (
-    Image,
     PageBreak,
     Paragraph,
     SimpleDocTemplate,
@@ -26,7 +24,6 @@ from reportlab.platypus import (
 BASE_DIR = Path(__file__).resolve().parents[1]
 ASSETS_DIR = BASE_DIR / "assets" / "proforma"
 DEFAULT_OUTPUT_DIR = BASE_DIR / "uploads" / "proformas"
-SIGNATURE_BACKGROUND_MASK = [245, 255, 245, 255, 245, 255]
 TEAMBUILDING_AGENCY_FEE_RATE = Decimal("0.175")
 
 IVT_ORANGE_DARK = colors.HexColor("#EA580C")
@@ -132,22 +129,6 @@ def _safe_pdf_path(reference: str, output_dir: str | Path | None = None) -> Path
     directory = Path(output_dir) if output_dir else DEFAULT_OUTPUT_DIR
     directory.mkdir(parents=True, exist_ok=True)
     return (directory / f"{clean_reference}.pdf").resolve()
-
-
-def _first_existing_asset(*filenames: str) -> Path | None:
-    for filename in filenames:
-        path = ASSETS_DIR / filename
-        if path.exists():
-            return path
-    return None
-
-
-def _image_dimensions(path: Path, max_width: float, max_height: float) -> tuple[float, float]:
-    image_width, image_height = ImageReader(str(path)).getSize()
-    if not image_width or not image_height:
-        return max_width, max_height
-    scale = min(max_width / image_width, max_height / image_height)
-    return image_width * scale, image_height * scale
 
 
 def _display_date(value: Any) -> str:
@@ -745,24 +726,6 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
         "CODE SWIFT : SGCI CIAB",
     )
 
-    signature_path = _first_existing_asset("signature1.png", "signature.png")
-    signature: Image | Spacer
-    if signature_path:
-        signature_width, signature_height = _image_dimensions(
-            signature_path,
-            max_width=62 * mm,
-            max_height=28 * mm,
-        )
-        signature = Image(
-            str(signature_path),
-            width=signature_width,
-            height=signature_height,
-            mask=SIGNATURE_BACKGROUND_MASK,
-        )
-        signature.hAlign = "CENTER"
-    else:
-        signature = Spacer(62 * mm, 28 * mm)
-
     story.append(Spacer(1, 6 * mm))
 
     signature_table = Table(
@@ -781,8 +744,6 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
                     _paragraph("Direction Générale", styles["center"]),
                     Spacer(1, 2 * mm),
                     _paragraph("Signature et cachet", styles["center"]),
-                    Spacer(1, 5 * mm),
-                    signature,
                 ],
             ]
         ],
