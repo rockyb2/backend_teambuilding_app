@@ -130,7 +130,7 @@ DemandeTeamBuildingStatut = Literal["nouvelle", "contactee", "devis_envoye", "co
 class OffreBase(ORMBaseModel):
     demande_id: int
     titre: str
-    montant_total: Decimal
+    montant_total: Decimal = Decimal("0")
     version: int = 1
     statut: OffreStatut = "brouillon"
     date_envoi: Optional[date] = None
@@ -181,6 +181,7 @@ class ProformaBase(ORMBaseModel):
     offre_tourisme_id: Optional[int] = None
     site_id: Optional[int] = None
     client: str
+    client_details: dict[str, Any] = Field(default_factory=dict)
     nombre_personnes: int
     objet: str
     date_proforma: date
@@ -208,6 +209,7 @@ class ProformaUpdate(ORMBaseModel):
     offre_tourisme_id: Optional[int] = None
     site_id: Optional[int] = None
     client: Optional[str] = None
+    client_details: Optional[dict[str, Any]] = None
     nombre_personnes: Optional[int] = None
     objet: Optional[str] = None
     date_proforma: Optional[date] = None
@@ -714,6 +716,282 @@ class CategorieDepenseUpdate(ORMBaseModel):
 
 class CategorieDepenseRead(CategorieDepenseBase):
     id: int
+
+
+TransportVehiculeStatut = Literal["disponible", "maintenance", "indisponible", "archive"]
+TransportTarifStatut = Literal["actif", "a_confirmer", "expire", "inactif"]
+
+
+class FournisseurTransportBase(ORMBaseModel):
+    nom: str
+    telephone: Optional[str] = None
+    email: Optional[str] = None
+    localisation: Optional[str] = None
+    actif: bool = True
+    created_by_id: Optional[int] = None
+
+
+class FournisseurTransportCreate(FournisseurTransportBase):
+    pass
+
+
+class FournisseurTransportUpdate(ORMBaseModel):
+    nom: Optional[str] = None
+    telephone: Optional[str] = None
+    email: Optional[str] = None
+    localisation: Optional[str] = None
+    actif: Optional[bool] = None
+
+
+class VehiculeTransportBase(ORMBaseModel):
+    fournisseur_id: int
+    type_vehicule: str = "car"
+    libelle: str
+    nombre_places: Optional[int] = Field(default=None, gt=0)
+    climatisation: bool = False
+    chauffeur_inclus: bool = True
+    carburant_inclus: bool = False
+    classe_peage: Optional[str] = None
+    immatriculation: Optional[str] = None
+    assurance_expiration: Optional[date] = None
+    visite_technique_expiration: Optional[date] = None
+    statut: TransportVehiculeStatut = "disponible"
+    actif: bool = True
+    created_by_id: Optional[int] = None
+
+
+class VehiculeTransportCreate(VehiculeTransportBase):
+    pass
+
+
+class VehiculeTransportUpdate(ORMBaseModel):
+    fournisseur_id: Optional[int] = None
+    type_vehicule: Optional[str] = None
+    libelle: Optional[str] = None
+    nombre_places: Optional[int] = Field(default=None, gt=0)
+    climatisation: Optional[bool] = None
+    chauffeur_inclus: Optional[bool] = None
+    carburant_inclus: Optional[bool] = None
+    classe_peage: Optional[str] = None
+    immatriculation: Optional[str] = None
+    assurance_expiration: Optional[date] = None
+    visite_technique_expiration: Optional[date] = None
+    statut: Optional[TransportVehiculeStatut] = None
+    actif: Optional[bool] = None
+
+
+class VehiculeTransportRead(VehiculeTransportBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class TrajetTransportBase(ORMBaseModel):
+    ville_depart: str
+    destination: str
+    axe_principal: Optional[str] = None
+    type_trajet: str = "aller_retour"
+    distance_km: Optional[Decimal] = Field(default=None, ge=0)
+    duree_estimee_minutes: Optional[int] = Field(default=None, ge=0)
+    nombre_peages: Optional[int] = Field(default=None, ge=0)
+    notes: Optional[str] = None
+    actif: bool = True
+    created_by_id: Optional[int] = None
+
+
+class TrajetTransportCreate(TrajetTransportBase):
+    pass
+
+
+class TrajetTransportUpdate(ORMBaseModel):
+    ville_depart: Optional[str] = None
+    destination: Optional[str] = None
+    axe_principal: Optional[str] = None
+    type_trajet: Optional[str] = None
+    distance_km: Optional[Decimal] = Field(default=None, ge=0)
+    duree_estimee_minutes: Optional[int] = Field(default=None, ge=0)
+    nombre_peages: Optional[int] = Field(default=None, ge=0)
+    notes: Optional[str] = None
+    actif: Optional[bool] = None
+
+
+class TrajetTransportRead(TrajetTransportBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class PeageTransportBase(ORMBaseModel):
+    nom_poste: str
+    axe: Optional[str] = None
+    classe_vehicule: Optional[str] = None
+    montant: Decimal = Field(default=Decimal("0"), ge=0)
+    date_application: Optional[date] = None
+    source: Optional[str] = None
+    actif: bool = True
+    created_by_id: Optional[int] = None
+
+
+class PeageTransportCreate(PeageTransportBase):
+    pass
+
+
+class PeageTransportUpdate(ORMBaseModel):
+    nom_poste: Optional[str] = None
+    axe: Optional[str] = None
+    classe_vehicule: Optional[str] = None
+    montant: Optional[Decimal] = Field(default=None, ge=0)
+    date_application: Optional[date] = None
+    source: Optional[str] = None
+    actif: Optional[bool] = None
+
+
+class PeageTransportRead(PeageTransportBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class TarifTransportBase(ORMBaseModel):
+    fournisseur_id: int
+    vehicule_id: Optional[int] = None
+    trajet_id: Optional[int] = None
+    type_transport: str
+    libelle: str
+    nombre_places: Optional[int] = Field(default=None, gt=0)
+    climatisation: bool = False
+    chauffeur_inclus: bool = True
+    carburant_inclus: bool = False
+    peage_inclus: bool = False
+    unite_tarif: str = "jour"
+    prix_unitaire: Decimal = Field(default=Decimal("0"), ge=0)
+    mode_tarif: str = "forfait"
+    zone_depart: Optional[str] = None
+    destination: Optional[str] = None
+    distance_km: Optional[Decimal] = Field(default=None, ge=0)
+    classe_peage: Optional[str] = None
+    montant_peage: Decimal = Field(default=Decimal("0"), ge=0)
+    montant_carburant: Decimal = Field(default=Decimal("0"), ge=0)
+    frais_chauffeur: Decimal = Field(default=Decimal("0"), ge=0)
+    frais_nuitee_chauffeur: Decimal = Field(default=Decimal("0"), ge=0)
+    frais_supplementaire: Decimal = Field(default=Decimal("0"), ge=0)
+    devise: str = "XOF"
+    date_debut_validite: Optional[date] = None
+    date_fin_validite: Optional[date] = None
+    conditions: Optional[str] = None
+    statut: TransportTarifStatut = "actif"
+    actif: bool = True
+    created_by_id: Optional[int] = None
+
+
+class TarifTransportCreate(TarifTransportBase):
+    pass
+
+
+class TarifTransportUpdate(ORMBaseModel):
+    fournisseur_id: Optional[int] = None
+    vehicule_id: Optional[int] = None
+    trajet_id: Optional[int] = None
+    type_transport: Optional[str] = None
+    libelle: Optional[str] = None
+    nombre_places: Optional[int] = Field(default=None, gt=0)
+    climatisation: Optional[bool] = None
+    chauffeur_inclus: Optional[bool] = None
+    carburant_inclus: Optional[bool] = None
+    peage_inclus: Optional[bool] = None
+    unite_tarif: Optional[str] = None
+    prix_unitaire: Optional[Decimal] = Field(default=None, ge=0)
+    mode_tarif: Optional[str] = None
+    zone_depart: Optional[str] = None
+    destination: Optional[str] = None
+    distance_km: Optional[Decimal] = Field(default=None, ge=0)
+    classe_peage: Optional[str] = None
+    montant_peage: Optional[Decimal] = Field(default=None, ge=0)
+    montant_carburant: Optional[Decimal] = Field(default=None, ge=0)
+    frais_chauffeur: Optional[Decimal] = Field(default=None, ge=0)
+    frais_nuitee_chauffeur: Optional[Decimal] = Field(default=None, ge=0)
+    frais_supplementaire: Optional[Decimal] = Field(default=None, ge=0)
+    devise: Optional[str] = None
+    date_debut_validite: Optional[date] = None
+    date_fin_validite: Optional[date] = None
+    conditions: Optional[str] = None
+    statut: Optional[TransportTarifStatut] = None
+    actif: Optional[bool] = None
+
+
+class TarifTransportRead(TarifTransportBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class FournisseurTransportRead(FournisseurTransportBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+    vehicules: list[VehiculeTransportRead] = Field(default_factory=list)
+    tarifs: list[TarifTransportRead] = Field(default_factory=list)
+
+
+BudgetStatut = Literal["brouillon", "genere", "valide", "annule"]
+
+
+class BudgetBase(ORMBaseModel):
+    offre_id: int
+    demande_team_building_id: Optional[int] = None
+    site_id: Optional[int] = None
+    titre: str
+    client: str
+    nombre_personnes: int = Field(gt=0)
+    date_budget: Optional[date] = None
+    date_evenement: Optional[date] = None
+    duree_jours: Optional[int] = Field(default=None, gt=0)
+    devise: str = "XOF"
+    sections: list[dict[str, Any]] = Field(default_factory=list)
+    options_selectionnees: dict[str, Any] = Field(default_factory=dict)
+    frais_agence: Decimal = Field(default=Decimal("0"), ge=0)
+    taux_tva_frais_agence: Decimal = Field(default=Decimal("0"), ge=0)
+    modalite_paiement: Optional[str] = None
+    notes: Optional[str] = None
+    statut: BudgetStatut = "brouillon"
+
+
+class BudgetCreate(BudgetBase):
+    pass
+
+
+class BudgetUpdate(ORMBaseModel):
+    offre_id: Optional[int] = None
+    demande_team_building_id: Optional[int] = None
+    site_id: Optional[int] = None
+    titre: Optional[str] = None
+    client: Optional[str] = None
+    nombre_personnes: Optional[int] = Field(default=None, gt=0)
+    date_budget: Optional[date] = None
+    date_evenement: Optional[date] = None
+    duree_jours: Optional[int] = Field(default=None, gt=0)
+    devise: Optional[str] = None
+    sections: Optional[list[dict[str, Any]]] = None
+    options_selectionnees: Optional[dict[str, Any]] = None
+    frais_agence: Optional[Decimal] = Field(default=None, ge=0)
+    taux_tva_frais_agence: Optional[Decimal] = Field(default=None, ge=0)
+    modalite_paiement: Optional[str] = None
+    notes: Optional[str] = None
+    statut: Optional[BudgetStatut] = None
+
+
+class BudgetRead(BudgetBase):
+    id: int
+    reference: str
+    sous_total_ht: Decimal
+    tva_frais_agence: Decimal
+    total_ht: Decimal
+    total_ttc: Decimal
+    fichier_pdf: Optional[str] = None
+    fichier_excel: Optional[str] = None
+    created_by_id: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
 
 
 class DepenseBase(ORMBaseModel):

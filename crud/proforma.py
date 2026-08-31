@@ -144,6 +144,11 @@ def _prepare_values(values: dict) -> dict:
     values["tva_frais_agence"] = totals["tva_frais_agence"]
     values["total_ttc"] = totals["total_ttc"]
     values["details_frais_agence"] = values.get("details_frais_agence") or []
+    values["client_details"] = (
+        values.get("client_details")
+        if isinstance(values.get("client_details"), dict)
+        else {}
+    )
     values["recommandations"] = values.get("recommandations") or []
     return values
 
@@ -269,6 +274,7 @@ def generate_pdf_for_proforma(db: Session, db_proforma: Proforma) -> Proforma:
         "pole": db_proforma.pole,
         "reference": db_proforma.reference,
         "client": db_proforma.client,
+        "client_details": db_proforma.client_details,
         "nombre_personnes": db_proforma.nombre_personnes,
         "objet": db_proforma.objet,
         "date_proforma": db_proforma.date_proforma,

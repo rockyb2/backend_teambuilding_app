@@ -170,7 +170,7 @@ class Offre(Base):
         default="brouillon",
         server_default=text("'brouillon'"),
     )
-    montant_total = Column(Numeric(12, 2), nullable=False)
+    montant_total = Column(Numeric(12, 2), nullable=False, default=0, server_default=text("0"))
     date_envoi = Column(Date, nullable=True)
     date_validation = Column(Date, nullable=True)
     date_expiration = Column(Date, nullable=True)
@@ -189,6 +189,7 @@ class Offre(Base):
     activite = relationship("Activite", back_populates="offre", uselist=False)
     depenses = relationship("Depense", back_populates="offre")
     proformas = relationship("Proforma", back_populates="offre")
+    budgets = relationship("Budget", back_populates="offre")
 
 
 class OffreTourisme(Base):
@@ -329,6 +330,7 @@ class Site(Base):
 
     activites = relationship("Activite", back_populates="site")
     proformas = relationship("Proforma", back_populates="site")
+    budgets = relationship("Budget", back_populates="site")
 
 
 class Activite(Base):
@@ -573,6 +575,235 @@ class CategorieDepense(Base):
     depenses = relationship("Depense", back_populates="categorie")
 
 
+class FournisseurTransport(Base):
+    __tablename__ = "fournisseurs_transport"
+    __table_args__ = (
+        UniqueConstraint("nom", name="uq_fournisseurs_transport_nom"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    nom = Column(String(150), nullable=False, index=True)
+    telephone = Column(String(50), nullable=True)
+    email = Column(String(150), nullable=True)
+    localisation = Column(String(150), nullable=True)
+    actif = Column(Boolean, nullable=False, default=True, server_default=text("true"), index=True)
+    created_by_id = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    tarifs = relationship(
+        "TarifTransport",
+        back_populates="fournisseur",
+        cascade="all, delete-orphan",
+    )
+    vehicules = relationship(
+        "VehiculeTransport",
+        back_populates="fournisseur",
+        cascade="all, delete-orphan",
+    )
+    created_by = relationship("Utilisateur", foreign_keys=[created_by_id])
+
+
+class VehiculeTransport(Base):
+    __tablename__ = "vehicules_transport"
+    __table_args__ = (
+        CheckConstraint(
+            "nombre_places IS NULL OR nombre_places > 0",
+            name="ck_vehicules_transport_nombre_places_pos",
+        ),
+        CheckConstraint(
+            "statut IN ('disponible','maintenance','indisponible','archive')",
+            name="ck_vehicules_transport_statut",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    fournisseur_id = Column(
+        Integer,
+        ForeignKey("fournisseurs_transport.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    type_vehicule = Column(String(50), nullable=False, index=True)
+    libelle = Column(String(255), nullable=False)
+    nombre_places = Column(Integer, nullable=True)
+    climatisation = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    chauffeur_inclus = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    carburant_inclus = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    classe_peage = Column(String(50), nullable=True)
+    immatriculation = Column(String(80), nullable=True)
+    assurance_expiration = Column(Date, nullable=True)
+    visite_technique_expiration = Column(Date, nullable=True)
+    statut = Column(String(30), nullable=False, default="disponible", server_default=text("'disponible'"))
+    actif = Column(Boolean, nullable=False, default=True, server_default=text("true"), index=True)
+    created_by_id = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    fournisseur = relationship("FournisseurTransport", back_populates="vehicules")
+    tarifs = relationship("TarifTransport", back_populates="vehicule")
+    created_by = relationship("Utilisateur", foreign_keys=[created_by_id])
+
+
+class TrajetTransport(Base):
+    __tablename__ = "trajets_transport"
+    __table_args__ = (
+        CheckConstraint(
+            "distance_km IS NULL OR distance_km >= 0",
+            name="ck_trajets_transport_distance_non_neg",
+        ),
+        CheckConstraint(
+            "duree_estimee_minutes IS NULL OR duree_estimee_minutes >= 0",
+            name="ck_trajets_transport_duree_non_neg",
+        ),
+        CheckConstraint(
+            "nombre_peages IS NULL OR nombre_peages >= 0",
+            name="ck_trajets_transport_nombre_peages_non_neg",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    ville_depart = Column(String(150), nullable=False, index=True)
+    destination = Column(String(150), nullable=False, index=True)
+    axe_principal = Column(String(255), nullable=True)
+    type_trajet = Column(String(50), nullable=False, default="aller_retour", server_default=text("'aller_retour'"))
+    distance_km = Column(Numeric(8, 2), nullable=True)
+    duree_estimee_minutes = Column(Integer, nullable=True)
+    nombre_peages = Column(Integer, nullable=True)
+    notes = Column(Text, nullable=True)
+    actif = Column(Boolean, nullable=False, default=True, server_default=text("true"), index=True)
+    created_by_id = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    tarifs = relationship("TarifTransport", back_populates="trajet")
+    created_by = relationship("Utilisateur", foreign_keys=[created_by_id])
+
+
+class PeageTransport(Base):
+    __tablename__ = "peages_transport"
+    __table_args__ = (
+        CheckConstraint("montant >= 0", name="ck_peages_transport_montant_non_neg"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    nom_poste = Column(String(150), nullable=False, index=True)
+    axe = Column(String(255), nullable=True)
+    classe_vehicule = Column(String(50), nullable=True, index=True)
+    montant = Column(Numeric(12, 2), nullable=False, default=0, server_default=text("0"))
+    date_application = Column(Date, nullable=True)
+    source = Column(String(255), nullable=True)
+    actif = Column(Boolean, nullable=False, default=True, server_default=text("true"), index=True)
+    created_by_id = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    created_by = relationship("Utilisateur", foreign_keys=[created_by_id])
+
+
+class TarifTransport(Base):
+    __tablename__ = "tarifs_transport"
+    __table_args__ = (
+        CheckConstraint(
+            "nombre_places IS NULL OR nombre_places > 0",
+            name="ck_tarifs_transport_nombre_places_pos",
+        ),
+        CheckConstraint("prix_unitaire >= 0", name="ck_tarifs_transport_prix_unitaire_non_neg"),
+        CheckConstraint("montant_peage >= 0", name="ck_tarifs_transport_montant_peage_non_neg"),
+        CheckConstraint("montant_carburant >= 0", name="ck_tarifs_transport_montant_carburant_non_neg"),
+        CheckConstraint("frais_chauffeur >= 0", name="ck_tarifs_transport_frais_chauffeur_non_neg"),
+        CheckConstraint(
+            "frais_nuitee_chauffeur >= 0",
+            name="ck_tarifs_transport_frais_nuitee_chauffeur_non_neg",
+        ),
+        CheckConstraint(
+            "frais_supplementaire >= 0",
+            name="ck_tarifs_transport_frais_supplementaire_non_neg",
+        ),
+        CheckConstraint(
+            "distance_km IS NULL OR distance_km >= 0",
+            name="ck_tarifs_transport_distance_non_neg",
+        ),
+        CheckConstraint(
+            "statut IN ('actif','a_confirmer','expire','inactif')",
+            name="ck_tarifs_transport_statut",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    fournisseur_id = Column(
+        Integer,
+        ForeignKey("fournisseurs_transport.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    vehicule_id = Column(
+        Integer,
+        ForeignKey("vehicules_transport.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    trajet_id = Column(
+        Integer,
+        ForeignKey("trajets_transport.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    type_transport = Column(String(50), nullable=False, index=True)
+    libelle = Column(String(255), nullable=False)
+    nombre_places = Column(Integer, nullable=True)
+    climatisation = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    chauffeur_inclus = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    carburant_inclus = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    peage_inclus = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    unite_tarif = Column(String(30), nullable=False, default="jour", server_default=text("'jour'"))
+    prix_unitaire = Column(Numeric(12, 2), nullable=False, default=0, server_default=text("0"))
+    mode_tarif = Column(String(30), nullable=False, default="forfait", server_default=text("'forfait'"))
+    zone_depart = Column(String(150), nullable=True)
+    destination = Column(String(150), nullable=True)
+    distance_km = Column(Numeric(8, 2), nullable=True)
+    classe_peage = Column(String(50), nullable=True)
+    montant_peage = Column(Numeric(12, 2), nullable=False, default=0, server_default=text("0"))
+    montant_carburant = Column(Numeric(12, 2), nullable=False, default=0, server_default=text("0"))
+    frais_chauffeur = Column(Numeric(12, 2), nullable=False, default=0, server_default=text("0"))
+    frais_nuitee_chauffeur = Column(Numeric(12, 2), nullable=False, default=0, server_default=text("0"))
+    frais_supplementaire = Column(Numeric(12, 2), nullable=False, default=0, server_default=text("0"))
+    devise = Column(String(10), nullable=False, default="XOF", server_default=text("'XOF'"))
+    date_debut_validite = Column(Date, nullable=True)
+    date_fin_validite = Column(Date, nullable=True)
+    conditions = Column(Text, nullable=True)
+    statut = Column(String(30), nullable=False, default="actif", server_default=text("'actif'"), index=True)
+    actif = Column(Boolean, nullable=False, default=True, server_default=text("true"), index=True)
+    created_by_id = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    fournisseur = relationship("FournisseurTransport", back_populates="tarifs")
+    vehicule = relationship("VehiculeTransport", back_populates="tarifs")
+    trajet = relationship("TrajetTransport", back_populates="tarifs")
+    created_by = relationship("Utilisateur", foreign_keys=[created_by_id])
+
+
 class Depense(Base):
     __tablename__ = "depense"
     __table_args__ = (
@@ -723,6 +954,7 @@ class DemandeTeamBuilding(Base):
     offres = relationship("Offre", back_populates="demande", cascade="all, delete-orphan")
     activites = relationship("Activite", back_populates="demande")
     proformas = relationship("Proforma", back_populates="demande")
+    budgets = relationship("Budget", back_populates="demande")
     factures = relationship("Facture", back_populates="demande_team_building")
     depenses = relationship("Depense", back_populates="demande_team_building")
 
@@ -858,6 +1090,7 @@ class Proforma(Base):
         index=True,
     )
     client = Column(String(255), nullable=False)
+    client_details = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
     nombre_personnes = Column(Integer, nullable=False)
     objet = Column(String(255), nullable=False)
     date_proforma = Column(Date, nullable=False)
@@ -896,6 +1129,76 @@ class Proforma(Base):
     created_by = relationship("Utilisateur", foreign_keys=[created_by_id], back_populates="proformas_creees")
     factures = relationship("Facture", back_populates="proforma")
     depenses = relationship("Depense", back_populates="proforma")
+
+
+class Budget(Base):
+    __tablename__ = "budgets"
+    __table_args__ = (
+        CheckConstraint(
+            "statut IN ('brouillon','genere','valide','annule')",
+            name="ck_budgets_statut",
+        ),
+        CheckConstraint("nombre_personnes > 0", name="ck_budgets_nombre_personnes_pos"),
+        CheckConstraint("duree_jours IS NULL OR duree_jours > 0", name="ck_budgets_duree_jours_pos"),
+        CheckConstraint("sous_total_ht >= 0", name="ck_budgets_sous_total_ht_non_neg"),
+        CheckConstraint("frais_agence >= 0", name="ck_budgets_frais_agence_non_neg"),
+        CheckConstraint("tva_frais_agence >= 0", name="ck_budgets_tva_frais_agence_non_neg"),
+        CheckConstraint("total_ht >= 0", name="ck_budgets_total_ht_non_neg"),
+        CheckConstraint("total_ttc >= 0", name="ck_budgets_total_ttc_non_neg"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    reference = Column(String(50), nullable=False, unique=True, index=True)
+    offre_id = Column(
+        Integer,
+        ForeignKey("offre.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    demande_team_building_id = Column(
+        Integer,
+        ForeignKey("demandes_team_building.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    site_id = Column(
+        Integer,
+        ForeignKey("site.id_site", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    titre = Column(String(255), nullable=False)
+    client = Column(String(255), nullable=False)
+    nombre_personnes = Column(Integer, nullable=False)
+    date_budget = Column(Date, nullable=False, server_default=func.current_date())
+    date_evenement = Column(Date, nullable=True)
+    duree_jours = Column(Integer, nullable=True)
+    devise = Column(String(10), nullable=False, default="XOF", server_default=text("'XOF'"))
+    sections = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    options_selectionnees = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    frais_agence = Column(Numeric(14, 2), nullable=False, default=0, server_default=text("0"))
+    taux_tva_frais_agence = Column(Numeric(5, 2), nullable=False, default=0, server_default=text("0"))
+    sous_total_ht = Column(Numeric(14, 2), nullable=False, default=0, server_default=text("0"))
+    tva_frais_agence = Column(Numeric(14, 2), nullable=False, default=0, server_default=text("0"))
+    total_ht = Column(Numeric(14, 2), nullable=False, default=0, server_default=text("0"))
+    total_ttc = Column(Numeric(14, 2), nullable=False, default=0, server_default=text("0"))
+    modalite_paiement = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
+    statut = Column(String(30), nullable=False, default="brouillon", server_default=text("'brouillon'"))
+    fichier_pdf = Column(String(500), nullable=True)
+    fichier_excel = Column(String(500), nullable=True)
+    created_by_id = Column(
+        Integer,
+        ForeignKey("utilisateur.id_utilisateur", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    offre = relationship("Offre", back_populates="budgets")
+    demande = relationship("DemandeTeamBuilding", back_populates="budgets")
+    site = relationship("Site", back_populates="budgets")
+    created_by = relationship("Utilisateur", foreign_keys=[created_by_id])
 
 
 class Facture(Base):

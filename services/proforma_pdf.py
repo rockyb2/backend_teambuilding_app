@@ -25,6 +25,14 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 ASSETS_DIR = BASE_DIR / "assets" / "proforma"
 DEFAULT_OUTPUT_DIR = BASE_DIR / "uploads" / "proformas"
 TEAMBUILDING_AGENCY_FEE_RATE = Decimal("0.175")
+CLIENT_DETAIL_FIELDS = (
+    ("adresse", "Adresse"),
+    ("ncc", "NCC"),
+    ("rccm", "RCCM"),
+    ("contact", "Contact"),
+    ("telephone", "Téléphone"),
+    ("email", "E-mail"),
+)
 
 IVT_ORANGE_DARK = colors.HexColor("#EA580C")
 IVT_ORANGE_SOFT = colors.HexColor("#FFF1E7")
@@ -118,6 +126,17 @@ def _paragraph(text: Any, style: ParagraphStyle) -> Paragraph:
 
 def _markup_paragraph(markup: str, style: ParagraphStyle) -> Paragraph:
     return Paragraph(markup, style)
+
+
+def _normalize_client_details(value: Any) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    normalized: dict[str, str] = {}
+    for key, _label in CLIENT_DETAIL_FIELDS:
+        text = str(value.get(key) or "").strip()
+        if text:
+            normalized[key] = text
+    return normalized
 
 
 def _safe_pdf_path(reference: str, output_dir: str | Path | None = None) -> Path:
@@ -514,6 +533,31 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
     )
     story.append(Spacer(1, 6 * mm))
 
+    client_details = _normalize_client_details(data.get("client_details"))
+    client_block: list[Any] = [
+        _paragraph("CLIENT", styles["right_bold"]),
+        Spacer(1, 1 * mm),
+        _paragraph(str(data["client"]), styles["right_bold"]),
+    ]
+    for detail_key, detail_label in CLIENT_DETAIL_FIELDS:
+        detail_value = client_details.get(detail_key)
+        if detail_value:
+            client_block.append(
+                _markup_paragraph(
+                    f"{escape(detail_label)} : {escape(detail_value)}",
+                    styles["right"],
+                )
+            )
+    client_block.extend(
+        [
+            Spacer(1, 3 * mm),
+            _markup_paragraph(
+                f"DATE : <b>{escape(_display_date(data['date_proforma']))}</b>",
+                styles["right"],
+            ),
+        ]
+    )
+
     header_info = Table(
         [
             [
@@ -522,14 +566,7 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
                     Spacer(1, 4 * mm),
                     _markup_paragraph("<i>Régime d'imposition : RSI</i>", styles["small_italic"]),
                 ],
-                [
-                    _markup_paragraph(f"CLIENT : <b>{escape(str(data['client']))}</b>", styles["right_bold"]),
-                    Spacer(1, 4 * mm),
-                    _markup_paragraph(
-                        f"DATE : <b>{escape(_display_date(data['date_proforma']))}</b>",
-                        styles["right"],
-                    ),
-                ],
+                client_block,
             ],
         ],
         colWidths=[99 * mm, 77 * mm],
