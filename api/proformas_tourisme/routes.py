@@ -11,7 +11,7 @@ from api.dependencies import get_db
 from crud import demande_tourisme as crud_demande_tourisme
 from crud import offre_tourisme as crud_offre_tourisme
 from crud import proforma as crud_proforma
-from database.schemas import ProformaCreate, ProformaRead
+from database.schemas import ProformaCreate, ProformaRead, ProformaUpdate
 from security import require_module_access
 from services.proforma_word import WORD_MEDIA_TYPE
 
@@ -145,6 +145,38 @@ def create_proforma_tourisme_from_offre(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
 
+@router.put("/{proforma_id}", response_model=ProformaRead)
+def update_proforma_tourisme(
+    proforma_id: int,
+    payload: ProformaUpdate,
+    db: Session = Depends(get_db),
+):
+    db_proforma = _get_tourism_proforma_or_404(db, proforma_id)
+    values = _payload_dump(payload, exclude_unset=True)
+    merged_values = {
+        "pole": "tourisme",
+        "demande_team_building_id": None,
+        "offre_id": None,
+        "demande_tourisme_id": db_proforma.demande_tourisme_id,
+        "demande_tourisme_custom_id": db_proforma.demande_tourisme_custom_id,
+        "offre_tourisme_id": db_proforma.offre_tourisme_id,
+        **values,
+    }
+    merged_values = _validate_tourism_context(db, merged_values)
+
+    values["pole"] = "tourisme"
+    values["demande_team_building_id"] = None
+    values["offre_id"] = None
+    values["demande_tourisme_id"] = merged_values.get("demande_tourisme_id")
+    values["demande_tourisme_custom_id"] = merged_values.get("demande_tourisme_custom_id")
+    values["offre_tourisme_id"] = merged_values.get("offre_tourisme_id")
+
+    try:
+        return crud_proforma.update_proforma(db, db_proforma, values)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+
 @router.post("/{proforma_id}/generate-pdf", response_model=ProformaRead)
 def generate_pdf_tourisme(proforma_id: int, db: Session = Depends(get_db)):
     db_proforma = _get_tourism_proforma_or_404(db, proforma_id)
@@ -168,7 +200,7 @@ def generate_word_tourisme(proforma_id: int, db: Session = Depends(get_db)):
     return FileResponse(
         path=Path(word_path),
         media_type=WORD_MEDIA_TYPE,
-        filename=f"{db_proforma.reference}.docx",
+        filename=crud_proforma.get_download_filename(db_proforma, "docx"),
     )
 
 
@@ -181,7 +213,7 @@ def download_pdf_tourisme(proforma_id: int, db: Session = Depends(get_db)):
     return FileResponse(
         path=Path(pdf_path),
         media_type="application/pdf",
-        filename=f"{db_proforma.reference}.pdf",
+        filename=crud_proforma.get_download_filename(db_proforma, "pdf"),
     )
 
 
@@ -197,5 +229,5 @@ def download_word_tourisme(proforma_id: int, db: Session = Depends(get_db)):
     return FileResponse(
         path=Path(word_path),
         media_type=WORD_MEDIA_TYPE,
-        filename=f"{db_proforma.reference}.docx",
+        filename=crud_proforma.get_download_filename(db_proforma, "docx"),
     )

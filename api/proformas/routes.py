@@ -18,6 +18,7 @@ from database.schemas import (
     ProformaAssistantSessionCreate,
     ProformaCreate,
     ProformaRead,
+    ProformaUpdate,
 )
 from security import require_module_access
 from services.proforma_assistant import create_assistant_session, handle_assistant_message
@@ -168,7 +169,7 @@ def generate_word(proforma_id: int, db: Session = Depends(get_db)):
     return FileResponse(
         path=Path(word_path),
         media_type=WORD_MEDIA_TYPE,
-        filename=f"{db_proforma.reference}.docx",
+        filename=crud_proforma.get_download_filename(db_proforma, "docx"),
     )
 
 
@@ -181,7 +182,7 @@ def download_pdf(proforma_id: int, db: Session = Depends(get_db)):
     return FileResponse(
         path=Path(pdf_path),
         media_type="application/pdf",
-        filename=f"{db_proforma.reference}.pdf",
+        filename=crud_proforma.get_download_filename(db_proforma, "pdf"),
     )
 
 
@@ -197,5 +198,34 @@ def download_word(proforma_id: int, db: Session = Depends(get_db)):
     return FileResponse(
         path=Path(word_path),
         media_type=WORD_MEDIA_TYPE,
-        filename=f"{db_proforma.reference}.docx",
+        filename=crud_proforma.get_download_filename(db_proforma, "docx"),
     )
+
+@router.put("/{proforma_id}", response_model=ProformaRead)
+def update_teambuilding_proforma(
+    proforma_id: int,
+    payload: ProformaUpdate,
+    db: Session = Depends(get_db),
+):
+    db_proforma = _get_teambuilding_proforma_or_404(db, proforma_id)
+    values = _payload_dump(payload, exclude_unset=True)
+
+    _ensure_context_exists(
+        db,
+        demande_id=values.get("demande_team_building_id", db_proforma.demande_team_building_id),
+        offre_id=values.get("offre_id", db_proforma.offre_id),
+        site_id=values.get("site_id", db_proforma.site_id),
+        demande_tourisme_id=values.get("demande_tourisme_id", db_proforma.demande_tourisme_id),
+        demande_tourisme_custom_id=values.get("demande_tourisme_custom_id", db_proforma.demande_tourisme_custom_id),
+        offre_tourisme_id=values.get("offre_tourisme_id", db_proforma.offre_tourisme_id),
+    )
+
+    values["pole"] = "teambuilding"
+    values["demande_tourisme_id"] = None
+    values["demande_tourisme_custom_id"] = None
+    values["offre_tourisme_id"] = None
+
+    try:
+        return crud_proforma.update_proforma(db, db_proforma, values)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc

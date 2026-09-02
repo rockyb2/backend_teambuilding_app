@@ -265,6 +265,16 @@ def update_proforma(db: Session, db_proforma: Proforma, payload: ProformaUpdate 
     for key, value in values.items():
         if hasattr(db_proforma, key):
             setattr(db_proforma, key, value)
+
+    db_proforma.fichier_pdf = None
+    if db_proforma.reference:
+        word_path = get_proforma_word_path(db_proforma.reference)
+        if word_path.exists():
+            try:
+                word_path.unlink()
+            except OSError:
+                pass
+
     db.commit()
     db.refresh(db_proforma)
     return db_proforma
@@ -301,6 +311,17 @@ def generate_pdf_for_proforma(db: Session, db_proforma: Proforma) -> Proforma:
 
 def generate_word_for_proforma(db_proforma: Proforma) -> Path:
     return Path(generate_proforma_word(_document_data(db_proforma)))
+
+
+def get_download_filename(db_proforma: Proforma, extension: str) -> str:
+    base_name = str(db_proforma.objet or db_proforma.reference or "proforma").strip()
+    clean_name = "".join(
+        char if char.isalnum() or char in (" ", "-", "_") else " "
+        for char in base_name
+    )
+    clean_name = " ".join(clean_name.split()) or str(db_proforma.reference or "proforma")
+    clean_extension = extension.lstrip(".")
+    return f"{clean_name}.{clean_extension}"
 
 
 def get_pdf_path(db_proforma: Proforma) -> Path | None:
