@@ -320,6 +320,15 @@ def _styles() -> dict[str, ParagraphStyle]:
             leading=11,
             textColor=colors.white,
         ),
+        "table_header": ParagraphStyle(
+            "TableHeaderProforma",
+            parent=sample["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=7.4,
+            leading=9,
+            alignment=TA_CENTER,
+            textColor=colors.white,
+        ),
     }
 
 
@@ -588,8 +597,18 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
     story.append(_markup_paragraph(f"<u>{escape(str(data['objet']).upper())}</u>", styles["title"]))
     story.append(Spacer(1, 5 * mm))
 
-    rows: list[list[Any]] = []
+    rows: list[list[Any]] = [
+        [
+            _paragraph("DESIGNATION", styles["table_header"]),
+            _paragraph("JOURS", styles["table_header"]),
+            _paragraph("QTE", styles["table_header"]),
+            _paragraph("UNITE", styles["table_header"]),
+            _paragraph("P.U. (FCFA)", styles["table_header"]),
+            _paragraph("MONTANT HT", styles["table_header"]),
+        ]
+    ]
     table_commands: list[tuple[Any, ...]] = [
+        ("BACKGROUND", (0, 0), (-1, 0), IVT_ORANGE_DARK),
         ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("LEFTPADDING", (0, 0), (-1, -1), 4.5),
@@ -647,6 +666,7 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
     services_table = Table(
         rows,
         colWidths=[79 * mm, 14 * mm, 14 * mm, 18 * mm, 25 * mm, 26 * mm],
+        repeatRows=1,
         hAlign="CENTER",
     )
     services_table.setStyle(TableStyle(table_commands))
