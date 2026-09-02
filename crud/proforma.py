@@ -16,6 +16,7 @@ from services.proforma_pdf import (
     calculate_totals,
     generate_proforma_pdf,
 )
+from services.proforma_word import generate_proforma_word, get_proforma_word_path
 
 
 PROFORMA_REFERENCE_PREFIX = "PRO"
@@ -269,8 +270,8 @@ def update_proforma(db: Session, db_proforma: Proforma, payload: ProformaUpdate 
     return db_proforma
 
 
-def generate_pdf_for_proforma(db: Session, db_proforma: Proforma) -> Proforma:
-    data = {
+def _document_data(db_proforma: Proforma) -> dict:
+    return {
         "pole": db_proforma.pole,
         "reference": db_proforma.reference,
         "client": db_proforma.client,
@@ -278,6 +279,7 @@ def generate_pdf_for_proforma(db: Session, db_proforma: Proforma) -> Proforma:
         "nombre_personnes": db_proforma.nombre_personnes,
         "objet": db_proforma.objet,
         "date_proforma": db_proforma.date_proforma,
+        "date_evenement": db_proforma.date_evenement,
         "sections": db_proforma.sections,
         "frais_agence": db_proforma.frais_agence,
         "details_frais_agence": db_proforma.details_frais_agence,
@@ -285,6 +287,10 @@ def generate_pdf_for_proforma(db: Session, db_proforma: Proforma) -> Proforma:
         "modalite_paiement": db_proforma.modalite_paiement,
         "notes": db_proforma.notes,
     }
+
+
+def generate_pdf_for_proforma(db: Session, db_proforma: Proforma) -> Proforma:
+    data = _document_data(db_proforma)
     pdf_path = generate_proforma_pdf(data)
     db_proforma.fichier_pdf = _relative_backend_path(pdf_path)
     db_proforma.statut = "pdf_genere"
@@ -293,5 +299,15 @@ def generate_pdf_for_proforma(db: Session, db_proforma: Proforma) -> Proforma:
     return db_proforma
 
 
+def generate_word_for_proforma(db_proforma: Proforma) -> Path:
+    return Path(generate_proforma_word(_document_data(db_proforma)))
+
+
 def get_pdf_path(db_proforma: Proforma) -> Path | None:
     return _absolute_backend_path(db_proforma.fichier_pdf)
+
+
+def get_word_path(db_proforma: Proforma) -> Path | None:
+    if not db_proforma.reference:
+        return None
+    return get_proforma_word_path(db_proforma.reference)

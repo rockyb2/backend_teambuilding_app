@@ -21,6 +21,7 @@ from database.schemas import (
 )
 from security import require_module_access
 from services.proforma_assistant import create_assistant_session, handle_assistant_message
+from services.proforma_word import WORD_MEDIA_TYPE
 
 
 router = APIRouter(
@@ -155,6 +156,22 @@ def generate_pdf(proforma_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
 
+@router.post("/{proforma_id}/generate-word")
+def generate_word(proforma_id: int, db: Session = Depends(get_db)):
+    db_proforma = _get_teambuilding_proforma_or_404(db, proforma_id)
+    if db_proforma.statut == "annulee":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Proforma annulee")
+    try:
+        word_path = crud_proforma.generate_word_for_proforma(db_proforma)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return FileResponse(
+        path=Path(word_path),
+        media_type=WORD_MEDIA_TYPE,
+        filename=f"{db_proforma.reference}.docx",
+    )
+
+
 @router.get("/{proforma_id}/download")
 def download_pdf(proforma_id: int, db: Session = Depends(get_db)):
     db_proforma = _get_teambuilding_proforma_or_404(db, proforma_id)
@@ -165,4 +182,20 @@ def download_pdf(proforma_id: int, db: Session = Depends(get_db)):
         path=Path(pdf_path),
         media_type="application/pdf",
         filename=f"{db_proforma.reference}.pdf",
+    )
+
+
+@router.get("/{proforma_id}/download/word")
+def download_word(proforma_id: int, db: Session = Depends(get_db)):
+    db_proforma = _get_teambuilding_proforma_or_404(db, proforma_id)
+    word_path = crud_proforma.get_word_path(db_proforma)
+    if not word_path or not word_path.exists() or not word_path.is_file():
+        try:
+            word_path = crud_proforma.generate_word_for_proforma(db_proforma)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return FileResponse(
+        path=Path(word_path),
+        media_type=WORD_MEDIA_TYPE,
+        filename=f"{db_proforma.reference}.docx",
     )

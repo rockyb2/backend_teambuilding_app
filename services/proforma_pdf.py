@@ -602,7 +602,6 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
             _paragraph("DESIGNATION", styles["table_header"]),
             _paragraph("JOURS", styles["table_header"]),
             _paragraph("QTE", styles["table_header"]),
-            _paragraph("UNITE", styles["table_header"]),
             _paragraph("P.U. (FCFA)", styles["table_header"]),
             _paragraph("MONTANT HT", styles["table_header"]),
         ]
@@ -619,7 +618,7 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
 
     for section in sections:
         section_row = len(rows)
-        rows.append([_paragraph(section["nom"].upper(), styles["bold_white"]), "", "", "", "", ""])
+        rows.append([_paragraph(section["nom"].upper(), styles["bold_white"]), "", "", "", ""])
         table_commands.append(("SPAN", (0, section_row), (-1, section_row)))
         table_commands.append(
             ("BACKGROUND", (0, section_row), (-1, section_row), IVT_ORANGE_DARK)
@@ -632,7 +631,6 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
                     _paragraph(item["designation"], styles["normal"]),
                     _paragraph(_format_quantity(item.get("nombre_jours")), styles["right"]),
                     _paragraph(_format_quantity(item.get("quantite")), styles["right"]),
-                    _paragraph(item.get("unite") or "", styles["right"]),
                     _paragraph(
                         _format_fcfa(item.get("prix_unitaire")) if item.get("prix_unitaire") else "",
                         styles["right"],
@@ -652,20 +650,19 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
                 "",
                 "",
                 "",
-                "",
                 _paragraph(_format_fcfa(section["sous_total"]), styles["right_bold"]),
             ]
         )
         table_commands.append(
             ("BACKGROUND", (0, subtotal_row), (-1, subtotal_row), IVT_ORANGE_SOFT)
         )
-        table_commands.append(("SPAN", (0, subtotal_row), (4, subtotal_row)))
+        table_commands.append(("SPAN", (0, subtotal_row), (3, subtotal_row)))
         table_commands.append(("TOPPADDING", (0, subtotal_row), (-1, subtotal_row), 6))
         table_commands.append(("BOTTOMPADDING", (0, subtotal_row), (-1, subtotal_row), 6))
 
     services_table = Table(
         rows,
-        colWidths=[79 * mm, 14 * mm, 14 * mm, 18 * mm, 25 * mm, 26 * mm],
+        colWidths=[91 * mm, 17 * mm, 17 * mm, 25 * mm, 26 * mm],
         repeatRows=1,
         hAlign="CENTER",
     )

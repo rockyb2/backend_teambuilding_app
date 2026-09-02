@@ -3,6 +3,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock
 
+from docx import Document
+
 from core.env_loader import load_local_env
 
 load_local_env()
@@ -13,6 +15,7 @@ from services.proforma_assistant import (
     search_best_sites,
 )
 from services.proforma_pdf import calculate_totals, generate_proforma_pdf
+from services.proforma_word import generate_proforma_word
 from crud.proforma import _prepare_values
 
 
@@ -153,6 +156,46 @@ class ProformaAssistantTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = generate_proforma_pdf(data, output_dir=temp_dir)
             self.assertTrue(path.endswith(".pdf"))
+
+    def test_generate_word_creates_file_without_unit_column(self):
+        data = {
+            "reference": "PRO-2026-0002",
+            "client": "Client Test",
+            "nombre_personnes": 20,
+            "date_proforma": "16/06/2026",
+            "objet": "Team building",
+            "sections": [
+                {
+                    "nom": "Transport",
+                    "prestations": [
+                        {
+                            "designation": "Location cars de 50 places",
+                            "nombre_jours": 1,
+                            "quantite": 13,
+                            "unite": "forfait",
+                            "prix_unitaire": 300000,
+                        },
+                    ],
+                }
+            ],
+            "frais_agence": 150000,
+            "taux_tva_frais_agence": 18,
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = generate_proforma_word(data, output_dir=temp_dir)
+            self.assertTrue(path.endswith(".docx"))
+
+            document = Document(path)
+            table_text = "\n".join(
+                cell.text
+                for table in document.tables
+                for row in table.rows
+                for cell in row.cells
+            )
+            self.assertIn("DESIGNATION", table_text)
+            self.assertIn("P.U. (FCFA)", table_text)
+            self.assertNotIn("UNITE", table_text)
+            self.assertNotIn("forfait", table_text)
 
     def test_sessions_are_isolated_by_user(self):
         session = create_assistant_session(Mock(), user_id=10)
