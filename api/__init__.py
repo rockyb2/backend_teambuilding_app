@@ -35,6 +35,7 @@ from api.role import router as roles_router
 from api.uploads import router as uploads_router
 from api.agent.routes import router as agent_router
 from api.contact_akan.routes import router as contact_akan_router
+from api.events import router as events_router
 
 
 
@@ -73,5 +74,6 @@ def include_api_routes(app):
     app.include_router(uploads_router)
     app.include_router(agent_router)
     app.include_router(contact_akan_router)
+    app.include_router(events_router)
 
 

@@ -15,7 +15,8 @@ setup_langfuse()
 
 from api import include_api_routes
 from database import models, schemas
-from database.connection import create_tables
+from database.connection import create_tables, engine
+from database.event_seed import initialize_events
 
 
 def get_allowed_origins() -> list[str]:
@@ -58,6 +59,7 @@ app.add_middleware(
 
 # Creer les tables au demarrage.
 create_tables()
+initialize_events(engine)
 
 # Inclure toutes les routes API.
 include_api_routes(app)

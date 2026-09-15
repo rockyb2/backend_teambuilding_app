@@ -1,0 +1,51 @@
+[
+  {
+    "titre": "Ajoupa Green Lodge",
+    "date": "2026-10-10",
+    "lieu": "Azaguié · lieu exact à préciser",
+    "tarif": 40000,
+    "description": "Une escapade nature en pleine forêt, entre jeux, détente et convivialité : l’Ajoupa vous offre une parenthèse ressourçante loin de l’agitation de la ville."
+  },
+  {
+    "titre": "Tiassalé",
+    "date": "2026-11-07",
+    "lieu": "Ahouakro, Kanganianzé, Ivoire Hôtel (déjeuner et détente)",
+    "tarif": 50000,
+    "description": "Cap sur Ahouakro et Kanganianzé pour une immersion authentique au cœur du terroir ivoirien, suivie d’un déjeuner et d’un moment de détente à l’Ivoire Hôtel."
+  },
+  {
+    "titre": "Atelier Chocolat",
+    "date": "2026-11-28",
+    "lieu": "Azaguié",
+    "tarif": 60000,
+    "description": "Direction Azaguié pour découvrir les secrets du cacao : de la plantation à la dégustation, un atelier gourmand et instructif pour petits et grands."
+  },
+  {
+    "titre": "Alloco Society",
+    "date": "2026-12-05",
+    "lieu": "Abidjan",
+    "tarif": 25000,
+    "description": "Une célébration 100 % ivoirienne autour de l’alloco, entre stands gourmands, animations musicales et bonne humeur, au cœur d’Abidjan."
+  },
+  {
+    "titre": "Akan Brunch",
+    "date": "2026-12-13",
+    "lieu": "Lieu à préciser",
+    "tarif": null,
+    "description": "Un brunch convivial aux couleurs du terroir akan, rythmé par des mets traditionnels, un spectacle culturel haut en couleurs et de beaux moments de partage."
+  },
+  {
+    "titre": "Akan Festival",
+    "date": null,
+    "lieu": "Lieu à préciser",
+    "tarif": null,
+    "description": "Le plus grand rassemblement célébrant la diversité et la splendeur des peuples Akan. Trois jours de festivités, de parades et de concerts."
+  },
+  {
+    "titre": "Les Jeudis Abidjanais",
+    "date": null,
+    "lieu": "Abidjan · lieu à préciser",
+    "tarif": null,
+    "description": "Le concept qui a redéfini le networking à Abidjan. Chaque jeudi, nous sélectionnons un lieu d’exception pour une soirée mêlant business et plaisir."
+  }
+]
