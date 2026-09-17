@@ -266,28 +266,28 @@ def _render_email_html(title: str, subtitle: str, badge: str, rows: list[tuple[s
     )
 
     return f"""\
-<!doctype html>
-<html lang="fr">
-  <body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;color:#0f172a;">
-    <div style="padding:32px 16px;">
-      <div style="max-width:760px;margin:0 auto;background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 18px 50px rgba(15,23,42,0.08);border:1px solid #e2e8f0;">
-        <div style="background:linear-gradient(135deg,{accent},#0f172a);padding:36px 40px;color:#ffffff;">
-          <div style="display:inline-block;background:rgba(255,255,255,0.16);border:1px solid rgba(255,255,255,0.18);padding:8px 14px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">{safe_badge}</div>
-          <h1 style="margin:18px 0 10px;font-size:30px;line-height:1.2;">{safe_title}</h1>
-          <p style="margin:0;font-size:15px;line-height:1.7;color:rgba(255,255,255,0.88);">{safe_subtitle}</p>
-        </div>
-        <div style="padding:32px 40px;">
-          <table style="width:100%;border-collapse:collapse;">
-            {row_html}
-          </table>
-        </div>
-        <div style="padding:20px 40px 32px;color:#94a3b8;font-size:12px;line-height:1.6;border-top:1px solid #e2e8f0;background:#f8fafc;">
-          Message généré automatiquement depuis le site IVOIR TRIPS.
-        </div>
-      </div>
-    </div>
-  </body>
-</html>
+                <!doctype html>
+                <html lang="fr">
+                <body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;color:#0f172a;">
+                    <div style="padding:32px 16px;">
+                    <div style="max-width:760px;margin:0 auto;background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 18px 50px rgba(15,23,42,0.08);border:1px solid #e2e8f0;">
+                        <div style="background:linear-gradient(135deg,{accent},#0f172a);padding:36px 40px;color:#ffffff;">
+                        <div style="display:inline-block;background:rgba(255,255,255,0.16);border:1px solid rgba(255,255,255,0.18);padding:8px 14px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">{safe_badge}</div>
+                        <h1 style="margin:18px 0 10px;font-size:30px;line-height:1.2;">{safe_title}</h1>
+                        <p style="margin:0;font-size:15px;line-height:1.7;color:rgba(255,255,255,0.88);">{safe_subtitle}</p>
+                        </div>
+                        <div style="padding:32px 40px;">
+                        <table style="width:100%;border-collapse:collapse;">
+                            {row_html}
+                        </table>
+                        </div>
+                        <div style="padding:20px 40px 32px;color:#94a3b8;font-size:12px;line-height:1.6;border-top:1px solid #e2e8f0;background:#f8fafc;">
+                        Message généré automatiquement depuis le site IVOIR TRIPS.
+                        </div>
+                    </div>
+                    </div>
+                </body>
+                </html>
 """
 
 

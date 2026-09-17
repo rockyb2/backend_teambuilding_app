@@ -55,6 +55,7 @@ app.add_middleware(
     allow_credentials="*" not in allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 # Creer les tables au demarrage.

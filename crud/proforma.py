@@ -1,22 +1,27 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from database.models import DemandeTourisme, DemandeTourismeCustom, OffreTourisme, Proforma
+from database.models import Budget, DemandeTeamBuilding, DemandeTourisme, DemandeTourismeCustom, OffreTourisme, Proforma
+from crud.budget import lock_offer, budget_document_data
 from database.schemas import ProformaCreate, ProformaUpdate
 from services.proforma_pdf import (
     BASE_DIR,
     TEAMBUILDING_AGENCY_FEE_RATE,
     calculate_totals,
     generate_proforma_pdf,
+    is_proforma_pdf_current,
 )
-from services.proforma_word import generate_proforma_word, get_proforma_word_path
+from services.proforma_word import generate_proforma_word, get_proforma_word_path, is_proforma_word_current
+from services.agency_fees import resolve_agency_fee_rate
 
 
 PROFORMA_REFERENCE_PREFIX = "PRO"
@@ -124,13 +129,16 @@ def generate_proforma_reference(db: Session, created_at: datetime | None = None)
 
 def _prepare_values(values: dict) -> dict:
     sections = values.get("sections") or []
-    vat_rate = values.get("taux_tva_frais_agence") or 18
+    vat_rate = values.get("taux_tva_frais_agence")
+    if vat_rate is None:
+        vat_rate = 18
     agency_fees = values.get("frais_agence") or 0
     agency_fee_rate = None
-    if values.get("pole") == "teambuilding":
+    if values.get("pole") == "teambuilding" and not values.get("budget_id"):
         agency_fee_rate = TEAMBUILDING_AGENCY_FEE_RATE
     elif values.get("pole") == "tourisme":
         agency_fee_rate = TOURISM_AGENCY_FEE_RATE
+    agency_fee_rate = resolve_agency_fee_rate(values.get("mode_frais_agence"), agency_fee_rate)
 
     totals = calculate_totals(
         sections,
@@ -154,12 +162,76 @@ def _prepare_values(values: dict) -> dict:
     return values
 
 
+def _validated_budget(db: Session, budget_id: int) -> Budget:
+    budget = db.query(Budget).filter(Budget.id == budget_id).first()
+    if not budget:
+        raise ValueError("Budget non trouvé.")
+    lock_offer(db, budget.offre_id)
+    db.refresh(budget)
+    if budget.statut != "valide":
+        raise ValueError("Seul le budget validé de l'offre peut servir à une nouvelle proforma.")
+    return budget
+
+
+def build_proforma_from_budget(db: Session, budget_id: int) -> dict:
+    budget = _validated_budget(db, budget_id)
+    demande = db.query(DemandeTeamBuilding).filter(DemandeTeamBuilding.id == budget.demande_team_building_id).first()
+    return {
+        "pole": "teambuilding", "budget_id": budget.id,
+        "demande_team_building_id": budget.demande_team_building_id,
+        "offre_id": budget.offre_id, "site_id": budget.site_id,
+        "client": budget.client,
+        "client_details": {
+            key: getattr(demande, attribute, None) or ""
+            for key, attribute in {
+                "adresse": "adresse", "contact": "nom_contact",
+                "telephone": "telephone_contact", "email": "email_contact",
+            }.items()
+        },
+        "nombre_personnes": budget.nombre_personnes,
+        "objet": budget.titre, "date_proforma": date.today(), "date_evenement": budget.date_evenement,
+        "sections": deepcopy(budget.sections), "frais_agence": budget.frais_agence,
+        "mode_frais_agence": budget.mode_frais_agence,
+        "taux_tva_frais_agence": budget.taux_tva_frais_agence,
+        "details_frais_agence": [], "modalite_paiement": budget.modalite_paiement,
+        "notes": budget.notes, "recommandations": [], "statut": "validee",
+    }
+
+
+def _attach_budget(db: Session, values: dict, existing: Proforma | None = None) -> dict:
+    budget_id = values.get("budget_id")
+    if values.get("pole") != "teambuilding":
+        if budget_id:
+            raise ValueError("Les budgets team building ne peuvent pas être utilisés pour le tourisme.")
+        return values
+    if existing and budget_id == existing.budget_id:
+        # An existing proforma keeps its snapshot, even after another budget is chosen.
+        if budget_id and any(values.get(key) != getattr(existing, key) for key in ("offre_id", "site_id", "demande_team_building_id")):
+            raise ValueError("Le contexte doit correspondre au budget de la proforma.")
+        values["budget_snapshot"] = deepcopy(existing.budget_snapshot)
+        return values
+    if not budget_id:
+        raise ValueError("Sélectionnez le budget validé de l'offre pour créer la proforma.")
+    budget = _validated_budget(db, budget_id)
+    if values.get("mode_frais_agence") is None:
+        values["mode_frais_agence"] = budget.mode_frais_agence
+    for key in ("offre_id", "site_id", "demande_team_building_id"):
+        if values.get(key) is not None and values[key] != getattr(budget, key):
+            raise ValueError("Le budget sélectionné ne correspond pas à l'offre, au site ou à la demande.")
+        values[key] = getattr(budget, key)
+    values["budget_snapshot"] = jsonable_encoder({
+        **budget_document_data(budget), "id": budget.id,
+        "updated_at": budget.updated_at, "total_ttc": budget.total_ttc,
+    })
+    return values
+
+
 def create_proforma(
     db: Session,
     payload: ProformaCreate,
     created_by_id: int | None = None,
 ) -> Proforma:
-    values = _prepare_values(_model_dump(payload))
+    values = _prepare_values(_attach_budget(db, _model_dump(payload)))
     values["reference"] = generate_proforma_reference(db)
     values["created_by_id"] = created_by_id
 
@@ -170,6 +242,9 @@ def create_proforma(
     return db_proforma
 
 
+
+
+# tourisme-specific helpers
 def _tourisme_client_name(demande: DemandeTourisme | DemandeTourismeCustom | None) -> str:
     if isinstance(demande, DemandeTourisme):
         values = (demande.prenom, demande.nom)
@@ -261,6 +336,7 @@ def update_proforma(db: Session, db_proforma: Proforma, payload: ProformaUpdate 
         if column.name not in {"id", "reference", "created_at", "updated_at", "created_by_id"}
     }
     values.update(updates)
+    values = _attach_budget(db, values, db_proforma)
     values = _prepare_values(values)
     for key, value in values.items():
         if hasattr(db_proforma, key):
@@ -282,6 +358,7 @@ def update_proforma(db: Session, db_proforma: Proforma, payload: ProformaUpdate 
 
 def _document_data(db_proforma: Proforma) -> dict:
     return {
+        "budget_id": db_proforma.budget_id,
         "pole": db_proforma.pole,
         "reference": db_proforma.reference,
         "client": db_proforma.client,
@@ -292,6 +369,7 @@ def _document_data(db_proforma: Proforma) -> dict:
         "date_evenement": db_proforma.date_evenement,
         "sections": db_proforma.sections,
         "frais_agence": db_proforma.frais_agence,
+        "mode_frais_agence": db_proforma.mode_frais_agence,
         "details_frais_agence": db_proforma.details_frais_agence,
         "taux_tva_frais_agence": db_proforma.taux_tva_frais_agence,
         "modalite_paiement": db_proforma.modalite_paiement,
@@ -325,10 +403,12 @@ def get_download_filename(db_proforma: Proforma, extension: str) -> str:
 
 
 def get_pdf_path(db_proforma: Proforma) -> Path | None:
-    return _absolute_backend_path(db_proforma.fichier_pdf)
+    path = _absolute_backend_path(db_proforma.fichier_pdf)
+    return path if path and is_proforma_pdf_current(path) else None
 
 
 def get_word_path(db_proforma: Proforma) -> Path | None:
     if not db_proforma.reference:
         return None
-    return get_proforma_word_path(db_proforma.reference)
+    path = get_proforma_word_path(db_proforma.reference)
+    return path if is_proforma_word_current(path) else None

@@ -172,7 +172,12 @@ ProformaStatut = Literal["brouillon", "validee", "pdf_genere", "annulee"]
 ProformaPole = Literal["teambuilding", "tourisme"]
 
 
+AgencyFeeMode = Literal["pourcentage", "montant"]
+
+
 class ProformaBase(ORMBaseModel):
+    mode_frais_agence: Optional[AgencyFeeMode] = None
+    budget_id: Optional[int] = None
     pole: ProformaPole = "teambuilding"
     demande_team_building_id: Optional[int] = None
     offre_id: Optional[int] = None
@@ -201,6 +206,8 @@ class ProformaCreate(ProformaBase):
 
 
 class ProformaUpdate(ORMBaseModel):
+    mode_frais_agence: Optional[AgencyFeeMode] = None
+    budget_id: Optional[int] = None
     pole: Optional[ProformaPole] = None
     demande_team_building_id: Optional[int] = None
     offre_id: Optional[int] = None
@@ -225,6 +232,7 @@ class ProformaUpdate(ORMBaseModel):
 
 
 class ProformaRead(ProformaBase):
+    budget_snapshot: dict[str, Any] = Field(default_factory=dict)
     id: int
     reference: str
     sous_total_ht: Decimal
@@ -789,12 +797,12 @@ class VehiculeTransportRead(VehiculeTransportBase):
 class TrajetTransportBase(ORMBaseModel):
     ville_depart: str
     destination: str
-    axe_principal: Optional[str] = None
-    type_trajet: str = "aller_retour"
+    # axe_principal: Optional[str] = None
+    # type_trajet: str = "aller_retour"
     distance_km: Optional[Decimal] = Field(default=None, ge=0)
-    duree_estimee_minutes: Optional[int] = Field(default=None, ge=0)
+    # duree_estimee_minutes: Optional[int] = Field(default=None, ge=0)
     nombre_peages: Optional[int] = Field(default=None, ge=0)
-    notes: Optional[str] = None
+    # notes: Optional[str] = None
     actif: bool = True
     created_by_id: Optional[int] = None
 
@@ -806,12 +814,12 @@ class TrajetTransportCreate(TrajetTransportBase):
 class TrajetTransportUpdate(ORMBaseModel):
     ville_depart: Optional[str] = None
     destination: Optional[str] = None
-    axe_principal: Optional[str] = None
-    type_trajet: Optional[str] = None
+    # axe_principal: Optional[str] = None
+    # type_trajet: Optional[str] = None
     distance_km: Optional[Decimal] = Field(default=None, ge=0)
-    duree_estimee_minutes: Optional[int] = Field(default=None, ge=0)
+    # duree_estimee_minutes: Optional[int] = Field(default=None, ge=0)
     nombre_peages: Optional[int] = Field(default=None, ge=0)
-    notes: Optional[str] = None
+    # notes: Optional[str] = None
     actif: Optional[bool] = None
 
 
@@ -937,6 +945,7 @@ BudgetStatut = Literal["brouillon", "genere", "valide", "annule"]
 
 
 class BudgetBase(ORMBaseModel):
+    mode_frais_agence: AgencyFeeMode = "montant"
     offre_id: int
     demande_team_building_id: Optional[int] = None
     site_id: Optional[int] = None
@@ -960,7 +969,16 @@ class BudgetCreate(BudgetBase):
     pass
 
 
+class BudgetMultiSiteCreate(ORMBaseModel):
+    budgets: list[BudgetCreate] = Field(min_length=1, max_length=50)
+
+
+class BudgetValidation(ORMBaseModel):
+    remplacer_budget_id: Optional[int] = None
+
+
 class BudgetUpdate(ORMBaseModel):
+    mode_frais_agence: Optional[AgencyFeeMode] = None
     offre_id: Optional[int] = None
     demande_team_building_id: Optional[int] = None
     site_id: Optional[int] = None
@@ -981,6 +999,7 @@ class BudgetUpdate(ORMBaseModel):
 
 
 class BudgetRead(BudgetBase):
+    groupe_reference: Optional[str] = None
     id: int
     reference: str
     sous_total_ht: Decimal

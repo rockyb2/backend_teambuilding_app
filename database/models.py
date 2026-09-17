@@ -12,6 +12,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    Index,
     Numeric,
     String,
     Text,
@@ -1045,6 +1046,9 @@ class Proforma(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
+    budget_id = Column(Integer, ForeignKey("budgets.id", ondelete="RESTRICT"), nullable=True, index=True)
+    budget_snapshot = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    mode_frais_agence = Column(String(20), nullable=True)
     reference = Column(String(50), nullable=False, unique=True, index=True)
     pole = Column(
         String(30),
@@ -1134,6 +1138,11 @@ class Proforma(Base):
 class Budget(Base):
     __tablename__ = "budgets"
     __table_args__ = (
+        Index(
+            "uq_budgets_offre_valide", "offre_id", unique=True,
+            postgresql_where=text("statut = 'valide'"),
+            sqlite_where=text("statut = 'valide'"),
+        ),
         CheckConstraint(
             "statut IN ('brouillon','genere','valide','annule')",
             name="ck_budgets_statut",
@@ -1148,6 +1157,8 @@ class Budget(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
+    groupe_reference = Column(String(50), nullable=True, index=True)
+    mode_frais_agence = Column(String(20), nullable=False, default="montant", server_default=text("'montant'"))
     reference = Column(String(50), nullable=False, unique=True, index=True)
     offre_id = Column(
         Integer,

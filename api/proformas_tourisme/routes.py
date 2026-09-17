@@ -209,6 +209,12 @@ def download_pdf_tourisme(proforma_id: int, db: Session = Depends(get_db)):
     db_proforma = _get_tourism_proforma_or_404(db, proforma_id)
     pdf_path = crud_proforma.get_pdf_path(db_proforma)
     if not pdf_path or not pdf_path.exists() or not pdf_path.is_file():
+        try:
+            crud_proforma.generate_pdf_for_proforma(db, db_proforma)
+            pdf_path = crud_proforma.get_pdf_path(db_proforma)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    if not pdf_path or not pdf_path.exists() or not pdf_path.is_file():
         raise HTTPException(status_code=404, detail="PDF non généré")
     return FileResponse(
         path=Path(pdf_path),

@@ -16,6 +16,52 @@ SALES_EMAIL = os.getenv("SALES_EMAIL", "contact@ivoirtrips.com")
 _sent_email_signatures = set()
 logger = logging.getLogger(__name__)
 
+API_KEY_ENV_BY_PROVIDER = {
+    "mistral": "MISTRAL_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
+    "zai": "ZAI_API_KEY",
+}
+
+OPENROUTER_MODEL_PREFIXES = (
+    "anthropic/",
+    "deepseek/",
+    "google/",
+    "meta-llama/",
+    "mistralai/",
+    "nex-agi/",
+    "nvidia/",
+    "openai/",
+    "qwen/",
+    "x-ai/",
+)
+
+
+def normalize_model_id(model_id):
+    model_id = (model_id or "").strip()
+
+    if model_id.startswith("o*/"):
+        model_id = f"openrouter/{model_id.removeprefix('o*/')}"
+
+    if model_id.startswith("openrouter/"):
+        return model_id
+
+    if model_id.startswith(OPENROUTER_MODEL_PREFIXES):
+        return f"openrouter/{model_id}"
+
+    return model_id
+
+
+def get_api_key_for_model(model_id):
+    provider = model_id.split("/", 1)[0].lower()
+    env_name = API_KEY_ENV_BY_PROVIDER.get(provider)
+    if not env_name:
+        return None
+
+    api_key = os.getenv(env_name, "").strip()
+    if not api_key:
+        raise RuntimeError(f"{env_name} est manquant pour le modele {model_id}")
+
+    return api_key
 
 def _env_int(name: str, default: int) -> int:
     try:
@@ -45,18 +91,19 @@ CHAT_AGENT_FALLBACK_MESSAGE_EN = os.getenv(
 
 
 
-def _create_model():
-    return LiteLLMModel(
-        model_id="mistral/mistral-large-latest",
-        api_key=os.getenv("MISTRAL_API_KEY"),
-    )
 
 
-def create_agent_chatbot():
+def create_agent_chatbot(model_id):
+    
     prompt = AGENT_INSTRUCTIONS
+    normalized_model_id = normalize_model_id(model_id)
+    model_kwargs = {"model_id": normalized_model_id}
+    api_key = get_api_key_for_model(normalized_model_id)
+    if api_key:
+        model_kwargs["api_key"] = api_key
 
     return ToolCallingAgent(
-        model=_create_model(),
+        model=LiteLLMModel(**model_kwargs),
         tools=build_chatbot_tools(),
         max_steps=15,
         name="agent_chatbot",
@@ -64,8 +111,8 @@ def create_agent_chatbot():
     )
 
 
-def create_agent():
-    return create_agent_chatbot()
+def create_agent(model_id):
+    return create_agent_chatbot(model_id)
 
 
 def _output_content(raw_output) -> str:
@@ -962,7 +1009,10 @@ def chat_with_agent(
     message_user: str,
     conversation_history: list[dict] | None = None,
     locale: str | None = None,
+    model_id: str | None = None
 ) -> str | dict:
+    
+    
     form_payload = _payload_from_conversation(message_user, conversation_history)
     if form_payload:
         _append_missing_points(form_payload)
@@ -974,11 +1024,22 @@ def chat_with_agent(
         return quick_response
 
     contextual_message = _build_contextual_message(message_user, conversation_history, locale)
-    try:
-        output = create_agent_chatbot().run(contextual_message)
-    except Exception:
-        logger.exception("Erreur pendant l'appel de l'agent chatbot")
-        return _fallback_message_for_user(message_user, locale)
+    model_ids = [model_id] if model_id else [
+    "openrouter/inclusionai/ling-3.0-flash-vl:free",
+    "openrouter/google/gemma-4-31b-it:free",
+    "openrouter/google/gemma-4-26b-a4b-it:free",
+    os.getenv("OPENROUTER_MODEL_ID") or os.getenv("OPENROUTER_MODEL"),
+    os.getenv("NEX_AGI_MODEL_ID"),
+    os.getenv("NEX_AGI_MODEL_ID2"),
+]
 
+    for candidate in dict.fromkeys(mid for mid in model_ids if mid):
+        try:
+            output = create_agent_chatbot(candidate).run(contextual_message)
+            break
+        except Exception:
+            logger.exception("Échec du modèle %s", candidate)
+    else:
+        return _fallback_message_for_user(message_user, locale)
     _notify_sales_team_if_needed(message_user, output, conversation_history)
     return _user_facing_response(output)

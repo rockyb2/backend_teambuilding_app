@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
+from services.agency_fees import resolve_agency_fee_rate
 
 from docx import Document
 from docx.enum.table import WD_ALIGN_VERTICAL, WD_TABLE_ALIGNMENT
@@ -29,6 +30,7 @@ from services.proforma_pdf import (
 IVT_ORANGE_DARK = "EA580C"
 IVT_ORANGE_SOFT = "FFF1E7"
 IVT_ORANGE_FAINT = "FFF7ED"
+IVT_TABLE_HEADER = "C74C0A"
 IVT_INK = "101828"
 IVT_MUTED = "667085"
 PAGE_CONTENT_WIDTH = Mm(176)
@@ -82,6 +84,13 @@ def _safe_word_path(reference: str, output_dir: str | Path | None = None) -> Pat
 
 def get_proforma_word_path(reference: str, output_dir: str | Path | None = None) -> Path:
     return _safe_word_path(reference, output_dir)
+
+
+def is_proforma_word_current(path: Path) -> bool:
+    if not path.is_file():
+        return False
+    dependencies = [Path(__file__), ASSETS_DIR / "signature1.png", ASSETS_DIR / "signature.png"]
+    return path.stat().st_mtime >= max(item.stat().st_mtime for item in dependencies if item.is_file())
 
 
 def _set_font(
@@ -414,11 +423,11 @@ def _add_services_table(document: Document, sections: list[dict[str, Any]]) -> N
             header,
             bold=True,
             color="FFFFFF",
-            size=7.4,
+            size=8.5,
             alignment=WD_ALIGN_PARAGRAPH.CENTER,
-            fill=IVT_ORANGE_DARK,
+            fill=IVT_TABLE_HEADER,
         )
-    _set_row_height(table.rows[0], Mm(8))
+    _set_row_height(table.rows[0], Mm(9))
 
     for section in sections:
         section_row = table.add_row()
@@ -450,7 +459,7 @@ def _add_services_table(document: Document, sections: list[dict[str, Any]]) -> N
                     cell,
                     value,
                     size=8.2,
-                    alignment=WD_ALIGN_PARAGRAPH.LEFT if index == 0 else WD_ALIGN_PARAGRAPH.RIGHT,
+                    alignment=WD_ALIGN_PARAGRAPH.LEFT if index == 0 else WD_ALIGN_PARAGRAPH.CENTER,
                     margins=(75, 100, 75, 100),
                 )
             _set_row_height(row, Mm(8))
@@ -465,6 +474,7 @@ def _add_services_table(document: Document, sections: list[dict[str, Any]]) -> N
             bold=True,
             color=IVT_ORANGE_DARK,
             size=8.3,
+            alignment=WD_ALIGN_PARAGRAPH.LEFT,
             fill=IVT_ORANGE_SOFT,
             margins=(95, 130, 95, 130),
         )
@@ -473,7 +483,7 @@ def _add_services_table(document: Document, sections: list[dict[str, Any]]) -> N
             _format_fcfa(section["sous_total"]),
             bold=True,
             size=8.4,
-            alignment=WD_ALIGN_PARAGRAPH.RIGHT,
+            alignment=WD_ALIGN_PARAGRAPH.CENTER,
             fill=IVT_ORANGE_SOFT,
             margins=(95, 100, 95, 100),
         )
@@ -606,7 +616,7 @@ def _add_conditions(document: Document, totals: dict[str, Any], data: dict[str, 
         "CODE SWIFT : SGCI CIAB",
     )
 
-    _add_spacer(document, 16)
+    _add_spacer(document, 32)
     signature_table = document.add_table(rows=1, cols=2)
     _set_table_width(signature_table)
     signature_table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -626,6 +636,17 @@ def _add_conditions(document: Document, totals: dict[str, Any], data: dict[str, 
         margins=(0, 0, 0, 0),
     )
     _clear_table_borders(signature_table)
+    signature_path = ASSETS_DIR / "signature1.png"
+    if not signature_path.is_file():
+        signature_path = ASSETS_DIR / "signature.png"
+    if signature_path.is_file():
+        paragraph = signature_table.rows[0].cells[1].add_paragraph()
+        _format_paragraph(paragraph, alignment=WD_ALIGN_PARAGRAPH.CENTER, before=8)
+        paragraph.add_run().add_picture(str(signature_path), width=Mm(60))
+        signature_table.rows[0].cells[0].vertical_alignment = WD_ALIGN_VERTICAL.TOP
+        signature_table.rows[0].cells[1].vertical_alignment = WD_ALIGN_VERTICAL.TOP
+        row_properties = signature_table.rows[0]._tr.get_or_add_trPr()
+        row_properties.append(OxmlElement("w:cantSplit"))
 
 
 def _add_control_line(
@@ -634,7 +655,7 @@ def _add_control_line(
     agency_fee_label: str,
     vat_rate: Decimal,
 ) -> None:
-    _add_spacer(document, 24)
+    _add_spacer(document, 40)
     control_line = (
         f"Contrôle des calculs : sous-total mise en œuvre = {_format_fcfa(totals['sous_total_ht'])} ; "
         f"{agency_fee_label} = {_format_fcfa(totals['frais_agence'])} ; "
@@ -655,13 +676,14 @@ def generate_proforma_word(data: dict[str, Any], output_dir: str | Path | None =
         raise ValueError("nombre_personnes doit être supérieur à zéro.")
 
     agency_fee_rate = data.get("taux_frais_agence")
-    if agency_fee_rate in (None, "") and str(data.get("pole") or "").lower() == "teambuilding":
+    if agency_fee_rate in (None, "") and str(data.get("pole") or "").lower() == "teambuilding" and not data.get("budget_id"):
         agency_fee_rate = TEAMBUILDING_AGENCY_FEE_RATE
+    agency_fee_rate = resolve_agency_fee_rate(data.get("mode_frais_agence"), agency_fee_rate)
 
     totals = calculate_totals(
         data.get("sections") or [],
         data.get("frais_agence") or 0,
-        data.get("taux_tva_frais_agence") or 18,
+        data.get("taux_tva_frais_agence") if data.get("taux_tva_frais_agence") is not None else 18,
         agency_fee_rate=agency_fee_rate,
     )
     sections = totals["sections"]

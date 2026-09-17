@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
@@ -349,6 +350,38 @@ def _synchronize_depense_constraints(connection):
     )
 
 
+def _synchronize_transport_budget_columns(connection):
+    if connection.dialect.name != "postgresql":
+        return
+
+    connection.execute(text("ALTER TABLE public.offre ALTER COLUMN montant_total SET DEFAULT 0"))
+    connection.execute(
+        text(
+            """
+            UPDATE public.offre
+            SET montant_total = 0
+            WHERE montant_total IS NULL
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            UPDATE public.tarifs_transport
+            SET
+                montant_peage = COALESCE(montant_peage, 0),
+                montant_carburant = COALESCE(montant_carburant, 0),
+                frais_chauffeur = COALESCE(frais_chauffeur, 0),
+                frais_nuitee_chauffeur = COALESCE(frais_nuitee_chauffeur, 0),
+                frais_supplementaire = COALESCE(frais_supplementaire, 0),
+                devise = COALESCE(devise, 'XOF'),
+                mode_tarif = COALESCE(mode_tarif, 'forfait'),
+                statut = COALESCE(statut, CASE WHEN actif IS FALSE THEN 'inactif' ELSE 'actif' END)
+            """
+        )
+    )
+
+
 def create_tables():
     from database import models  # noqa: F401
 
@@ -381,6 +414,9 @@ def create_tables():
             "date_depart_souhaitee": "DATE NULL",
         },
         "proformas": {
+            "mode_frais_agence": "VARCHAR(20) NULL",
+            "budget_id": "INTEGER NULL REFERENCES budgets(id) ON DELETE RESTRICT",
+            "budget_snapshot": "JSONB NOT NULL DEFAULT '{}'::jsonb",
             "pole": "VARCHAR(30) NOT NULL DEFAULT 'teambuilding'",
             "demande_tourisme_id": (
                 "INTEGER NULL REFERENCES demandes_tourisme(id) ON DELETE SET NULL"
@@ -395,6 +431,10 @@ def create_tables():
         "materiel": {
             "marque": "VARCHAR(100) NULL",
             "modele": "VARCHAR(150) NULL",
+        },
+        "budgets": {
+            "mode_frais_agence": "VARCHAR(20) NOT NULL DEFAULT 'montant'",
+            "groupe_reference": "VARCHAR(50) NULL",
         },
         "depense": {
             "pole": "VARCHAR(30) NOT NULL DEFAULT 'teambuilding'",
@@ -413,6 +453,23 @@ def create_tables():
             "demande_tourisme_custom_id": (
                 "INTEGER NULL REFERENCES demandes_tourisme_custom(id) ON DELETE SET NULL"
             ),
+        },
+        "tarifs_transport": {
+            "vehicule_id": "INTEGER NULL",
+            "trajet_id": "INTEGER NULL",
+            "mode_tarif": "VARCHAR(30) NOT NULL DEFAULT 'forfait'",
+            "distance_km": "NUMERIC(8, 2) NULL",
+            "classe_peage": "VARCHAR(50) NULL",
+            "montant_peage": "NUMERIC(12, 2) NOT NULL DEFAULT 0",
+            "montant_carburant": "NUMERIC(12, 2) NOT NULL DEFAULT 0",
+            "frais_chauffeur": "NUMERIC(12, 2) NOT NULL DEFAULT 0",
+            "frais_nuitee_chauffeur": "NUMERIC(12, 2) NOT NULL DEFAULT 0",
+            "frais_supplementaire": "NUMERIC(12, 2) NOT NULL DEFAULT 0",
+            "devise": "VARCHAR(10) NOT NULL DEFAULT 'XOF'",
+            "date_debut_validite": "DATE NULL",
+            "date_fin_validite": "DATE NULL",
+            "conditions": "TEXT NULL",
+            "statut": "VARCHAR(30) NOT NULL DEFAULT 'actif'",
         },
     }
 
@@ -438,3 +495,7 @@ def create_tables():
         _synchronize_tourism_request_columns(connection)
         _synchronize_proforma_constraints(connection)
         _synchronize_depense_constraints(connection)
+        _synchronize_transport_budget_columns(connection)
+        if connection.dialect.name == "postgresql":
+            migration = Path(__file__).parent / "sql" / "2026_09_09_budget_multi_sites.sql"
+            connection.execute(text(migration.read_text(encoding="utf-8")))

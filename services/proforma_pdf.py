@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from services.agency_fees import resolve_agency_fee_rate
+
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
@@ -11,7 +13,9 @@ from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
 from reportlab.platypus import (
+    Image,
     PageBreak,
     Paragraph,
     SimpleDocTemplate,
@@ -37,6 +41,7 @@ CLIENT_DETAIL_FIELDS = (
 IVT_ORANGE_DARK = colors.HexColor("#EA580C")
 IVT_ORANGE_SOFT = colors.HexColor("#FFF1E7")
 IVT_ORANGE_FAINT = colors.HexColor("#FFF7ED")
+IVT_TABLE_HEADER = colors.HexColor("#004C29")
 IVT_INK = colors.HexColor("#101828")
 IVT_MUTED = colors.HexColor("#667085")
 LETTER_PAGE_SIZE = (612, 792)
@@ -148,6 +153,31 @@ def _safe_pdf_path(reference: str, output_dir: str | Path | None = None) -> Path
     directory = Path(output_dir) if output_dir else DEFAULT_OUTPUT_DIR
     directory.mkdir(parents=True, exist_ok=True)
     return (directory / f"{clean_reference}.pdf").resolve()
+
+
+def is_proforma_pdf_current(path: Path) -> bool:
+    if not path.is_file():
+        return False
+    dependencies = [Path(__file__), ASSETS_DIR / "signature1.png", ASSETS_DIR / "signature.png"]
+    return path.stat().st_mtime >= max(item.stat().st_mtime for item in dependencies if item.is_file())
+
+
+def _signature_image(max_width: float = 60 * mm, max_height: float = 22 * mm) -> Image | None:
+    signature_path = ASSETS_DIR / "signature1.png"
+    if not signature_path.is_file():
+        signature_path = ASSETS_DIR / "signature.png"
+    if not signature_path.is_file():
+        return None
+    image_width, image_height = ImageReader(str(signature_path)).getSize()
+    scale = min(max_width / image_width, max_height / image_height)
+    signature = Image(
+        str(signature_path),
+        width=image_width * scale,
+        height=image_height * scale,
+        mask="auto",
+    )
+    signature.hAlign = "CENTER"
+    return signature
 
 
 def _display_date(value: Any) -> str:
@@ -324,10 +354,28 @@ def _styles() -> dict[str, ParagraphStyle]:
             "TableHeaderProforma",
             parent=sample["Normal"],
             fontName="Helvetica-Bold",
-            fontSize=7.4,
-            leading=9,
+            fontSize=8.5,
+            leading=10.2,
             alignment=TA_CENTER,
             textColor=colors.white,
+        ),
+        "table_cell": ParagraphStyle(
+            "TableCellProforma",
+            parent=sample["Normal"],
+            fontName="Helvetica",
+            fontSize=8.2,
+            leading=10,
+            alignment=TA_CENTER,
+            textColor=IVT_INK,
+        ),
+        "table_cell_bold": ParagraphStyle(
+            "TableCellBoldProforma",
+            parent=sample["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=8.4,
+            leading=12.8,
+            alignment=TA_CENTER,
+            textColor=IVT_INK,
         ),
     }
 
@@ -503,13 +551,14 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
         raise ValueError("nombre_personnes doit être supérieur à zéro.")
 
     agency_fee_rate = data.get("taux_frais_agence")
-    if agency_fee_rate in (None, "") and str(data.get("pole") or "").lower() == "teambuilding":
+    if agency_fee_rate in (None, "") and str(data.get("pole") or "").lower() == "teambuilding" and not data.get("budget_id"):
         agency_fee_rate = TEAMBUILDING_AGENCY_FEE_RATE
+    agency_fee_rate = resolve_agency_fee_rate(data.get("mode_frais_agence"), agency_fee_rate)
 
     totals = calculate_totals(
         data.get("sections") or [],
         data.get("frais_agence") or 0,
-        data.get("taux_tva_frais_agence") or 18,
+        data.get("taux_tva_frais_agence") if data.get("taux_tva_frais_agence") is not None else 18,
         agency_fee_rate=agency_fee_rate,
     )
     sections = totals["sections"]
@@ -540,7 +589,8 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
             styles["center"],
         )
     )
-    story.append(Spacer(1, 6 * mm))
+    # Leave sufficient room after the payment details before the signature area.
+    story.append(Spacer(1, 12 * mm))
 
     client_details = _normalize_client_details(data.get("client_details"))
     client_block: list[Any] = [
@@ -607,13 +657,15 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
         ]
     ]
     table_commands: list[tuple[Any, ...]] = [
-        ("BACKGROUND", (0, 0), (-1, 0), IVT_ORANGE_DARK),
-        ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+        ("BACKGROUND", (0, 0), (-1, 0), IVT_TABLE_HEADER),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("LEFTPADDING", (0, 0), (-1, -1), 4.5),
         ("RIGHTPADDING", (0, 0), (-1, -1), 4.5),
         ("TOPPADDING", (0, 0), (-1, -1), 5),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, 0), 6.5),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 6.5),
     ]
 
     for section in sections:
@@ -629,15 +681,15 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
             rows.append(
                 [
                     _paragraph(item["designation"], styles["normal"]),
-                    _paragraph(_format_quantity(item.get("nombre_jours")), styles["right"]),
-                    _paragraph(_format_quantity(item.get("quantite")), styles["right"]),
+                    _paragraph(_format_quantity(item.get("nombre_jours")), styles["table_cell"]),
+                    _paragraph(_format_quantity(item.get("quantite")), styles["table_cell"]),
                     _paragraph(
                         _format_fcfa(item.get("prix_unitaire")) if item.get("prix_unitaire") else "",
-                        styles["right"],
+                        styles["table_cell"],
                     ),
                     _paragraph(
                         _format_fcfa(item.get("montant_ht")) if item.get("montant_ht") else "F CFA",
-                        styles["right"],
+                        styles["table_cell"],
                     ),
                 ]
             )
@@ -650,7 +702,7 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
                 "",
                 "",
                 "",
-                _paragraph(_format_fcfa(section["sous_total"]), styles["right_bold"]),
+                _paragraph(_format_fcfa(section["sous_total"]), styles["table_cell_bold"]),
             ]
         )
         table_commands.append(
@@ -780,7 +832,26 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
         "CODE SWIFT : SGCI CIAB",
     )
 
-    story.append(Spacer(1, 6 * mm))
+    story.append(Spacer(1, 30 * mm))
+
+    ivoir_trips_signature = [
+        _paragraph("POUR IVOIR TRIPS INTERNATIONAL", styles["center"]),
+    ]
+    signature_image = _signature_image()
+    if signature_image is not None:
+        signature_holder = Table([[signature_image]], colWidths=[88 * mm])
+        signature_holder.setStyle(
+            TableStyle(
+                [
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ]
+            )
+        )
+        ivoir_trips_signature.extend([Spacer(1, 2 * mm), signature_holder])
 
     signature_table = Table(
         [
@@ -792,13 +863,7 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
                     Spacer(1, 2 * mm),
                     _paragraph("Mention « Bon pour Accord »", styles["center"]),
                 ],
-                [
-                    _paragraph("POUR IVOIR TRIPS INTERNATIONAL", styles["center"]),
-                    Spacer(1, 2 * mm),
-                    _paragraph("Direction Générale", styles["center"]),
-                    Spacer(1, 2 * mm),
-                    _paragraph("Signature et cachet", styles["center"]),
-                ],
+                ivoir_trips_signature,
             ]
         ],
         colWidths=[88 * mm, 88 * mm],
@@ -816,7 +881,8 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
         )
     )
     story.append(signature_table)
-    story.append(Spacer(1, 12 * mm))
+    # Keep the calculation summary visually separate from the signature area.
+    story.append(Spacer(1, 20 * mm))
 
     control_line = (
         f"Contrôle des calculs : sous-total mise en œuvre = {_format_fcfa(totals['sous_total_ht'])} ; "

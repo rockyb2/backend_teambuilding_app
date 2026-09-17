@@ -8,6 +8,7 @@ from api.offres import router as offres_router
 from api.offres_tourisme import router as offres_tourisme_router
 from api.factures import router as factures_router
 from api.finance import router as finance_router
+from api.budgets import router as budgets_router
 from api.proformas import router as proformas_router
 from api.proformas_tourisme import router as proformas_tourisme_router
 from api.sites import router as sites_router
@@ -20,6 +21,11 @@ from api.personnel import router as personnel_router
 from api.affectations import router as affectations_router
 from api.materiels import router as materiels_router
 from api.materiels_production import router as materiels_production_router
+from api.fournisseurs_transport import router as fournisseurs_transport_router
+from api.fournisseurs_transport import vehicules_router as vehicules_transport_router
+from api.fournisseurs_transport import trajets_router as trajets_transport_router
+from api.fournisseurs_transport import peages_router as peages_transport_router
+from api.fournisseurs_transport import tarifs_router as tarifs_transport_router
 from api.depenses import router as depenses_router
 from api.categories_depenses import router as categories_depenses_router
 from api.benevoles import router as benevoles_router
@@ -47,6 +53,7 @@ def include_api_routes(app):
     app.include_router(offres_tourisme_router)
     app.include_router(factures_router)
     app.include_router(finance_router)
+    app.include_router(budgets_router)
     app.include_router(proformas_router)
     app.include_router(proformas_tourisme_router)
     app.include_router(sites_router)
@@ -59,6 +66,11 @@ def include_api_routes(app):
     app.include_router(affectations_router)
     app.include_router(materiels_router)
     app.include_router(materiels_production_router)
+    app.include_router(fournisseurs_transport_router)
+    app.include_router(vehicules_transport_router)
+    app.include_router(trajets_transport_router)
+    app.include_router(peages_transport_router)
+    app.include_router(tarifs_transport_router)
     app.include_router(depenses_router)
     app.include_router(categories_depenses_router)
     app.include_router(benevoles_router)
