@@ -22,9 +22,10 @@ from sqlalchemy.orm import Session
 
 from crud import budget as budgets
 from crud import proforma as proformas
+from crud import site as sites
 from database.base import Base
 from database.models import Budget, Offre
-from database.schemas import BudgetCreate, ProformaCreate
+from database.schemas import BudgetCreate, ProformaCreate, SiteCreate
 from services import budget_documents, proforma_pdf, proforma_word
 
 
@@ -83,6 +84,63 @@ class BudgetWorkflowTests(unittest.TestCase):
         self.assertEqual(second.statut, "valide")
         self.assertEqual(self.db.query(Budget).filter_by(statut="valide").count(), 1)
         self.assertEqual(self.db.get(Offre, 1).montant_total, second.total_ttc)
+
+    def test_drink_fees_persist_from_site_to_budget_exports_and_proforma(self):
+        tarifs = {
+            "droit_bouchon_vin": 3000,
+            "droit_bouchon_champagne": 12000,
+            "droit_bouchon_alcool_fort": 7000,
+            "frais_soft": 1500,
+        }
+        site = sites.create_site(self.db, SiteCreate(
+            nom_site="Site boissons", a_restauration=True, tarifs_restauration=tarifs,
+        ))
+        self.db.expire_all()
+        self.assertEqual(sites.get_site(self.db, site.id_site).tarifs_restauration, tarifs)
+        quantities = {
+            "droit_bouchon_vin": 6,
+            "droit_bouchon_champagne": 2,
+            "droit_bouchon_alcool_fort": 3,
+        }
+        labels = [
+            ("droit_bouchon_vin", "Droit de bouchon vin (par bouteille)", 6),
+            ("droit_bouchon_champagne", "Droit de bouchon champagne (par bouteille)", 2),
+            ("droit_bouchon_alcool_fort", "Droit de bouchon alcools forts (par bouteille)", 3),
+            ("frais_soft", "Frais soft (par personne)", 40),
+        ]
+        budget = self.create(
+            site_id=site.id_site, nombre_personnes=40, duree_jours=3, frais_agence=0,
+            sections=[{"nom": "Restauration", "prestations": [
+                {"designation": label, "nombre_jours": 1, "quantite": quantity,
+                 "prix_unitaire": site.tarifs_restauration[key]}
+                for key, label, quantity in labels
+            ]}],
+            options_selectionnees={"restauration_quantites": quantities},
+        )
+        self.db.expire_all()
+        self.assertEqual(budget.options_selectionnees["restauration_quantites"], quantities)
+        self.assertEqual(budget.total_ttc, Decimal("123000"))
+        data = budgets.budget_document_data(budget)
+        pdf = budget_documents.generate_budget_pdf(data, output_dir=self.output.name)
+        self.assertTrue(Path(pdf).is_file())
+        workbook = load_workbook(budget_documents.generate_budget_excel(data, output_dir=self.output.name))
+        self.addCleanup(workbook.close)
+        sheet = workbook.active
+        for key, label, quantity in labels:
+            row = next(cell.row for cell in sheet["B"] if cell.value == label)
+            self.assertEqual(sheet.cell(row, 3).value, quantity)
+            self.assertEqual(sheet.cell(row, 4).value, tarifs[key])
+            self.assertEqual(sheet.cell(row, 5).value, 1)
+        self.assertFalse(any(
+            str(cell.value).startswith("Droit de bouchon vin :")
+            for row in sheet for cell in row if cell.value
+        ))
+        budgets.validate_budget(self.db, budget)
+        proforma = proformas.create_proforma(self.db, ProformaCreate(
+            **proformas.build_proforma_from_budget(self.db, budget.id)
+        ))
+        self.assertEqual(proforma.total_ttc, Decimal("123000"))
+        self.assertEqual([line["quantite"] for line in proforma.sections[0]["prestations"]], ["6", "2", "3", "40"])
 
     def test_database_rejects_two_approvals_even_without_crud(self):
         first, second = self.create(), self.create(2)

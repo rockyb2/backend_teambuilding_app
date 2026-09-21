@@ -200,8 +200,8 @@ def _styles() -> dict[str, ParagraphStyle]:
             "NormalProforma",
             parent=sample["Normal"],
             fontName="Helvetica",
-            fontSize=8.4,
-            leading=10.2,
+            fontSize=8,
+            leading=9.6,
             alignment=TA_LEFT,
             textColor=IVT_INK,
         ),
@@ -218,15 +218,24 @@ def _styles() -> dict[str, ParagraphStyle]:
             parent=sample["Normal"],
             fontName="Helvetica-Oblique",
             fontSize=7.8,
-            leading=12.8,
+            leading=9.6,
             textColor=IVT_MUTED,
         ),
         "center": ParagraphStyle(
             "CenterProforma",
             parent=sample["Normal"],
             fontName="Helvetica",
-            fontSize=9,
-            leading=11,
+            fontSize=8,
+            leading=9.6,
+            alignment=TA_CENTER,
+            textColor=IVT_INK,
+        ),
+        "reference": ParagraphStyle(
+            "ReferenceProforma",
+            parent=sample["Normal"],
+            fontName="Helvetica",
+            fontSize=14,
+            leading=16,
             alignment=TA_CENTER,
             textColor=IVT_INK,
         ),
@@ -234,8 +243,8 @@ def _styles() -> dict[str, ParagraphStyle]:
             "TitleProforma",
             parent=sample["Normal"],
             fontName="Helvetica-Bold",
-            fontSize=11,
-            leading=13,
+            fontSize=14,
+            leading=16,
             alignment=TA_CENTER,
             textColor=IVT_INK,
         ),
@@ -251,8 +260,8 @@ def _styles() -> dict[str, ParagraphStyle]:
             "ConditionsTitleProforma",
             parent=sample["Normal"],
             fontName="Helvetica-Bold",
-            fontSize=16,
-            leading=19,
+            fontSize=14,
+            leading=16,
             alignment=TA_CENTER,
             textColor=IVT_ORANGE_DARK,
         ),
@@ -260,15 +269,15 @@ def _styles() -> dict[str, ParagraphStyle]:
             "BoxTitleProforma",
             parent=sample["Normal"],
             fontName="Helvetica-Bold",
-            fontSize=10,
-            leading=12,
+            fontSize=8.5,
+            leading=10,
             textColor=IVT_ORANGE_DARK,
         ),
         "section": ParagraphStyle(
             "SectionProforma",
             parent=sample["Normal"],
             fontName="Helvetica-Bold",
-            fontSize=8.3,
+            fontSize=8.5,
             leading=10,
             leftIndent=5,
             textColor=IVT_ORANGE_DARK,
@@ -277,8 +286,8 @@ def _styles() -> dict[str, ParagraphStyle]:
             "RightProforma",
             parent=sample["Normal"],
             fontName="Helvetica",
-            fontSize=8.2,
-            leading=10,
+            fontSize=8,
+            leading=9.6,
             alignment=TA_RIGHT,
             textColor=IVT_INK,
         ),
@@ -286,8 +295,8 @@ def _styles() -> dict[str, ParagraphStyle]:
             "RightBoldProforma",
             parent=sample["Normal"],
             fontName="Helvetica-Bold",
-            fontSize=8.4,
-            leading=12.8,
+            fontSize=8,
+            leading=9.6,
             alignment=TA_RIGHT,
             textColor=IVT_INK,
         ),
@@ -295,8 +304,8 @@ def _styles() -> dict[str, ParagraphStyle]:
             "RightWhiteBoldProforma",
             parent=sample["Normal"],
             fontName="Helvetica-Bold",
-            fontSize=9.2,
-            leading=12,
+            fontSize=8.5,
+            leading=10,
             alignment=TA_RIGHT,
             textColor=colors.white,
         ),
@@ -304,24 +313,24 @@ def _styles() -> dict[str, ParagraphStyle]:
             "SummaryLabelProforma",
             parent=sample["Normal"],
             fontName="Helvetica",
-            fontSize=9.2,
-            leading=12.5,
+            fontSize=8.5,
+            leading=10,
             textColor=IVT_INK,
         ),
         "summary_label_bold": ParagraphStyle(
             "SummaryLabelBoldProforma",
             parent=sample["Normal"],
             fontName="Helvetica-Bold",
-            fontSize=9.2,
-            leading=12.5,
+            fontSize=8.5,
+            leading=10,
             textColor=IVT_INK,
         ),
         "summary_amount": ParagraphStyle(
             "SummaryAmountProforma",
             parent=sample["Normal"],
             fontName="Helvetica",
-            fontSize=9.2,
-            leading=12.5,
+            fontSize=8.5,
+            leading=10,
             alignment=TA_RIGHT,
             textColor=IVT_INK,
         ),
@@ -329,8 +338,8 @@ def _styles() -> dict[str, ParagraphStyle]:
             "SummaryAmountBoldProforma",
             parent=sample["Normal"],
             fontName="Helvetica-Bold",
-            fontSize=9.8,
-            leading=12.5,
+            fontSize=8.5,
+            leading=10,
             alignment=TA_RIGHT,
             textColor=IVT_ORANGE_DARK,
         ),
@@ -338,7 +347,7 @@ def _styles() -> dict[str, ParagraphStyle]:
             "BoldProforma",
             parent=sample["Normal"],
             fontName="Helvetica-Bold",
-            fontSize=8.3,
+            fontSize=8.5,
             leading=10,
             textColor=IVT_INK,
         ),
@@ -346,8 +355,8 @@ def _styles() -> dict[str, ParagraphStyle]:
             "BoldWhiteProforma",
             parent=sample["Normal"],
             fontName="Helvetica-Bold",
-            fontSize=8.6,
-            leading=11,
+            fontSize=8.5,
+            leading=10,
             textColor=colors.white,
         ),
         "table_header": ParagraphStyle(
@@ -355,7 +364,7 @@ def _styles() -> dict[str, ParagraphStyle]:
             parent=sample["Normal"],
             fontName="Helvetica-Bold",
             fontSize=8.5,
-            leading=10.2,
+            leading=10,
             alignment=TA_CENTER,
             textColor=colors.white,
         ),
@@ -363,8 +372,8 @@ def _styles() -> dict[str, ParagraphStyle]:
             "TableCellProforma",
             parent=sample["Normal"],
             fontName="Helvetica",
-            fontSize=8.2,
-            leading=10,
+            fontSize=8,
+            leading=9.6,
             alignment=TA_CENTER,
             textColor=IVT_INK,
         ),
@@ -372,8 +381,8 @@ def _styles() -> dict[str, ParagraphStyle]:
             "TableCellBoldProforma",
             parent=sample["Normal"],
             fontName="Helvetica-Bold",
-            fontSize=8.4,
-            leading=12.8,
+            fontSize=8,
+            leading=9.6,
             alignment=TA_CENTER,
             textColor=IVT_INK,
         ),
@@ -586,16 +595,14 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
     story.append(
         _markup_paragraph(
             f"PROFORMA&nbsp;&nbsp;N°<b>{escape(reference)}</b>",
-            styles["center"],
+            styles["reference"],
         )
     )
-    # Leave sufficient room after the payment details before the signature area.
-    story.append(Spacer(1, 12 * mm))
+    story.append(Spacer(1, 2 * mm))
 
     client_details = _normalize_client_details(data.get("client_details"))
     client_block: list[Any] = [
         _paragraph("CLIENT", styles["right_bold"]),
-        Spacer(1, 1 * mm),
         _paragraph(str(data["client"]), styles["right_bold"]),
     ]
     for detail_key, detail_label in CLIENT_DETAIL_FIELDS:
@@ -609,7 +616,6 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
             )
     client_block.extend(
         [
-            Spacer(1, 3 * mm),
             _markup_paragraph(
                 f"DATE : <b>{escape(_display_date(data['date_proforma']))}</b>",
                 styles["right"],
@@ -622,7 +628,7 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
             [
                 [
                     _markup_paragraph("<i>Centre des impôts : Cocody deux plateaux 3</i>", styles["small_italic"]),
-                    Spacer(1, 4 * mm),
+                    Spacer(1, 1.5 * mm),
                     _markup_paragraph("<i>Régime d'imposition : RSI</i>", styles["small_italic"]),
                 ],
                 client_block,
@@ -643,9 +649,9 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
         )
     )
     story.append(header_info)
-    story.append(Spacer(1, 6 * mm))
+    story.append(Spacer(1, 2 * mm))
     story.append(_markup_paragraph(f"<u>{escape(str(data['objet']).upper())}</u>", styles["title"]))
-    story.append(Spacer(1, 5 * mm))
+    story.append(Spacer(1, 2 * mm))
 
     rows: list[list[Any]] = [
         [
@@ -662,10 +668,8 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("LEFTPADDING", (0, 0), (-1, -1), 4.5),
         ("RIGHTPADDING", (0, 0), (-1, -1), 4.5),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ("TOPPADDING", (0, 0), (-1, 0), 6.5),
-        ("BOTTOMPADDING", (0, 0), (-1, 0), 6.5),
+        ("TOPPADDING", (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
     ]
 
     for section in sections:
@@ -709,8 +713,6 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
             ("BACKGROUND", (0, subtotal_row), (-1, subtotal_row), IVT_ORANGE_SOFT)
         )
         table_commands.append(("SPAN", (0, subtotal_row), (3, subtotal_row)))
-        table_commands.append(("TOPPADDING", (0, subtotal_row), (-1, subtotal_row), 6))
-        table_commands.append(("BOTTOMPADDING", (0, subtotal_row), (-1, subtotal_row), 6))
 
     services_table = Table(
         rows,
@@ -720,7 +722,7 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
     )
     services_table.setStyle(TableStyle(table_commands))
     story.append(services_table)
-    story.append(Spacer(1, 5 * mm))
+    story.append(Spacer(1, 3 * mm))
 
     amount_in_words = _format_amount_words_fcfa(totals["total_ttc"])
     payment_terms = str(data.get("modalite_paiement") or "100 % à la commande").strip()
@@ -770,8 +772,8 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 4),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-                ("TOPPADDING", (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
                 ("VALIGN", (0, 0), (0, 0), "TOP"),
                 ("BACKGROUND", (1, 2), (2, 3), IVT_ORANGE_SOFT),
                 ("BACKGROUND", (1, 4), (2, 4), IVT_ORANGE_DARK),
@@ -781,7 +783,7 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
     story.append(financial_table)
     story.append(PageBreak())
     story.append(_paragraph("CONDITIONS COMMERCIALES & VALIDATION", styles["conditions_title"]))
-    story.append(Spacer(1, 3 * mm))
+    story.append(Spacer(1, 2 * mm))
     story.append(
         _markup_paragraph(
             "<b>Montant arrêté à la somme de :</b> "
@@ -791,13 +793,12 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
     )
 
     def append_info_box(title: str, body_markup: str) -> None:
-        story.append(Spacer(1, 3 * mm))
+        story.append(Spacer(1, 2 * mm))
         box = Table(
             [
                 [
                     [
                         _paragraph(title, styles["box_title"]),
-                        Spacer(1, 2 * mm),
                         _markup_paragraph(body_markup, styles["normal"]),
                     ]
                 ]
@@ -811,8 +812,8 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
                     ("BACKGROUND", (0, 0), (-1, -1), IVT_ORANGE_FAINT),
                     ("LEFTPADDING", (0, 0), (-1, -1), 7),
                     ("RIGHTPADDING", (0, 0), (-1, -1), 7),
-                    ("TOPPADDING", (0, 0), (-1, -1), 6),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
                 ]
             )
         )
@@ -832,7 +833,8 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
         "CODE SWIFT : SGCI CIAB",
     )
 
-    story.append(Spacer(1, 30 * mm))
+    # 2 rem at a 16 px root size corresponds to 24 print points.
+    story.append(Spacer(1, 32 * mm))
 
     ivoir_trips_signature = [
         _paragraph("POUR IVOIR TRIPS INTERNATIONAL", styles["center"]),
@@ -851,16 +853,14 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
                 ]
             )
         )
-        ivoir_trips_signature.extend([Spacer(1, 2 * mm), signature_holder])
+        ivoir_trips_signature.extend([Spacer(1, 1 * mm), signature_holder])
 
     signature_table = Table(
         [
             [
                 [
                     _paragraph("POUR LE CLIENT", styles["center"]),
-                    Spacer(1, 2 * mm),
                     _paragraph("Nom, signature et cachet", styles["center"]),
-                    Spacer(1, 2 * mm),
                     _paragraph("Mention « Bon pour Accord »", styles["center"]),
                 ],
                 ivoir_trips_signature,
@@ -882,7 +882,7 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
     )
     story.append(signature_table)
     # Keep the calculation summary visually separate from the signature area.
-    story.append(Spacer(1, 20 * mm))
+    story.append(Spacer(1, 24 * mm))
 
     control_line = (
         f"Contrôle des calculs : sous-total mise en œuvre = {_format_fcfa(totals['sous_total_ht'])} ; "

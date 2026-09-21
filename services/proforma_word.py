@@ -128,7 +128,7 @@ def _add_paragraph(
     bold: bool = False,
     italic: bool = False,
     color: str = IVT_INK,
-    size: float = 8.4,
+    size: float = 8,
     alignment: WD_ALIGN_PARAGRAPH = WD_ALIGN_PARAGRAPH.LEFT,
     underline: bool = False,
     before: float = 0,
@@ -144,7 +144,9 @@ def _add_paragraph(
 
 def _add_spacer(document: Document, height: float) -> None:
     paragraph = document.add_paragraph()
-    _format_paragraph(paragraph, after=height)
+    _format_paragraph(paragraph)
+    paragraph.paragraph_format.line_spacing = Pt(height)
+    _set_font(paragraph.add_run(), size=1)
 
 
 def _set_table_width(table: Any, width: Any = PAGE_CONTENT_WIDTH) -> None:
@@ -193,9 +195,9 @@ def _set_cell_shading(cell: Any, fill: str) -> None:
 def _set_cell_margins(
     cell: Any,
     *,
-    top: int = 70,
+    top: int = 40,
     start: int = 90,
-    bottom: int = 70,
+    bottom: int = 40,
     end: int = 90,
 ) -> None:
     tc_pr = cell._tc.get_or_add_tcPr()
@@ -252,10 +254,10 @@ def _cell_text(
     bold: bool = False,
     italic: bool = False,
     color: str = IVT_INK,
-    size: float = 8.2,
+    size: float = 8,
     alignment: WD_ALIGN_PARAGRAPH = WD_ALIGN_PARAGRAPH.LEFT,
     fill: str | None = None,
-    margins: tuple[int, int, int, int] = (70, 90, 70, 90),
+    margins: tuple[int, int, int, int] = (40, 90, 40, 90),
 ) -> None:
     cell.text = ""
     cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
@@ -279,7 +281,7 @@ def _add_cell_paragraph(
     bold: bool = False,
     italic: bool = False,
     color: str = IVT_INK,
-    size: float = 8.2,
+    size: float = 8,
     alignment: WD_ALIGN_PARAGRAPH = WD_ALIGN_PARAGRAPH.LEFT,
     after: float = 0,
 ) -> Any:
@@ -303,8 +305,11 @@ def _set_document_defaults(document: Document) -> None:
 
     style = document.styles["Normal"]
     style.font.name = "Helvetica"
-    style.font.size = Pt(8.4)
+    style.font.size = Pt(8)
     style.font.color.rgb = RGBColor.from_string(IVT_INK)
+    style.paragraph_format.space_before = Pt(0)
+    style.paragraph_format.space_after = Pt(0)
+    style.paragraph_format.line_spacing = 1
 
     header = section.header
     header.paragraphs[0].text = ""
@@ -345,11 +350,11 @@ def _add_document_header(document: Document, data: dict[str, Any], reference: st
         document,
         "PROFORMA  N°",
         alignment=WD_ALIGN_PARAGRAPH.CENTER,
-        size=9,
-        after=18,
+        size=14,
+        after=6,
     )
     ref_run = title.add_run(reference)
-    _set_font(ref_run, size=9, bold=True)
+    _set_font(ref_run, size=14, bold=True)
 
     header_table = document.add_table(rows=1, cols=2)
     _set_table_width(header_table)
@@ -368,7 +373,7 @@ def _add_document_header(document: Document, data: dict[str, Any], reference: st
         italic=True,
         color=IVT_MUTED,
         size=7.4,
-        after=14,
+        after=4,
     )
     _add_cell_paragraph(
         left_cell,
@@ -395,17 +400,17 @@ def _add_document_header(document: Document, data: dict[str, Any], reference: st
         alignment=WD_ALIGN_PARAGRAPH.RIGHT,
     )
     date_run = date_paragraph.add_run(_display_date(data["date_proforma"]))
-    _set_font(date_run, size=8.2, bold=True)
+    _set_font(date_run, size=8, bold=True)
 
-    _add_spacer(document, 14)
+    _add_spacer(document, 6)
     _add_paragraph(
         document,
         str(data["objet"]).upper(),
         bold=True,
         underline=True,
         alignment=WD_ALIGN_PARAGRAPH.CENTER,
-        size=11,
-        after=14,
+        size=14,
+        after=6,
     )
 
 
@@ -427,7 +432,7 @@ def _add_services_table(document: Document, sections: list[dict[str, Any]]) -> N
             alignment=WD_ALIGN_PARAGRAPH.CENTER,
             fill=IVT_TABLE_HEADER,
         )
-    _set_row_height(table.rows[0], Mm(9))
+    _set_row_height(table.rows[0], Mm(5))
 
     for section in sections:
         section_row = table.add_row()
@@ -438,11 +443,11 @@ def _add_services_table(document: Document, sections: list[dict[str, Any]]) -> N
             str(section["nom"]).upper(),
             bold=True,
             color="FFFFFF",
-            size=8.6,
+            size=8.5,
             fill=IVT_ORANGE_DARK,
-            margins=(70, 100, 70, 100),
+            margins=(40, 100, 40, 100),
         )
-        _set_row_height(section_row, Mm(8))
+        _set_row_height(section_row, Mm(5))
 
         for item in section["prestations"]:
             row = table.add_row()
@@ -458,11 +463,11 @@ def _add_services_table(document: Document, sections: list[dict[str, Any]]) -> N
                 _cell_text(
                     cell,
                     value,
-                    size=8.2,
+                    size=8,
                     alignment=WD_ALIGN_PARAGRAPH.LEFT if index == 0 else WD_ALIGN_PARAGRAPH.CENTER,
-                    margins=(75, 100, 75, 100),
+                    margins=(40, 100, 40, 100),
                 )
-            _set_row_height(row, Mm(8))
+            _set_row_height(row, Mm(5))
 
         subtotal_row = table.add_row()
         _apply_column_widths(subtotal_row, widths)
@@ -473,21 +478,21 @@ def _add_services_table(document: Document, sections: list[dict[str, Any]]) -> N
             f"TOTAL {str(section['nom']).upper()}",
             bold=True,
             color=IVT_ORANGE_DARK,
-            size=8.3,
+            size=8.5,
             alignment=WD_ALIGN_PARAGRAPH.LEFT,
             fill=IVT_ORANGE_SOFT,
-            margins=(95, 130, 95, 130),
+            margins=(40, 130, 40, 130),
         )
         _cell_text(
             amount_cell,
             _format_fcfa(section["sous_total"]),
             bold=True,
-            size=8.4,
+            size=8,
             alignment=WD_ALIGN_PARAGRAPH.CENTER,
             fill=IVT_ORANGE_SOFT,
-            margins=(95, 100, 95, 100),
+            margins=(40, 100, 40, 100),
         )
-        _set_row_height(subtotal_row, Mm(9))
+        _set_row_height(subtotal_row, Mm(5))
 
     _clear_table_borders(table)
 
@@ -514,14 +519,14 @@ def _add_financial_summary(
     ]
     for row_index, (title, label, amount) in enumerate(rows):
         row = table.rows[row_index]
-        title_size = 14 if title else 8.2
+        title_size = 14 if title else 8
         _cell_text(
             row.cells[0],
             title,
             bold=bool(title),
             color=IVT_ORANGE_DARK if title else IVT_INK,
             size=title_size,
-            margins=(80, 0, 80, 0),
+            margins=(40, 0, 40, 0),
         )
 
         is_total_row = row_index == 4
@@ -534,53 +539,53 @@ def _add_financial_summary(
             label,
             bold=row_index >= 2,
             color=text_color,
-            size=9.2,
+            size=8.5,
             fill=fill,
-            margins=(85, 100, 85, 100),
+            margins=(40, 100, 40, 100),
         )
         _cell_text(
             row.cells[2],
             _format_fcfa(amount),
             bold=row_index >= 2,
             color=amount_color,
-            size=9.2 if row_index < 4 else 9.8,
+            size=8.5,
             alignment=WD_ALIGN_PARAGRAPH.RIGHT,
             fill=fill,
-            margins=(85, 100, 85, 100),
+            margins=(40, 100, 40, 100),
         )
-        _set_row_height(row, Mm(8.5))
+        _set_row_height(row, Mm(5))
 
     _clear_table_borders(table)
 
 
 def _add_amount_in_words(document: Document, amount: Any) -> None:
     paragraph = document.add_paragraph()
-    _format_paragraph(paragraph, after=8)
+    _format_paragraph(paragraph)
     label = paragraph.add_run("Montant arrêté à la somme de : ")
-    _set_font(label, size=8.4, bold=True)
+    _set_font(label, size=8, bold=True)
     value = paragraph.add_run(_format_amount_words_fcfa(amount))
-    _set_font(value, size=8.4, color=IVT_ORANGE_DARK, bold=True)
+    _set_font(value, size=8, color=IVT_ORANGE_DARK, bold=True)
 
 
 def _add_info_box(document: Document, title: str, body: str) -> None:
-    _add_spacer(document, 7)
+    _add_spacer(document, 6)
     table = document.add_table(rows=1, cols=1)
     _set_table_width(table)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     cell = table.rows[0].cells[0]
     _set_cell_shading(cell, IVT_ORANGE_FAINT)
-    _set_cell_margins(cell, top=120, start=140, bottom=120, end=140)
+    _set_cell_margins(cell, top=60, start=140, bottom=60, end=140)
     cell.text = ""
     paragraph = cell.paragraphs[0]
     _format_paragraph(paragraph)
     title_run = paragraph.add_run(title)
-    _set_font(title_run, size=10, color=IVT_ORANGE_DARK, bold=True)
+    _set_font(title_run, size=8.5, color=IVT_ORANGE_DARK, bold=True)
     paragraph.add_run().add_break()
     for line_index, line in enumerate(body.splitlines()):
         if line_index:
             paragraph.add_run().add_break()
         body_run = paragraph.add_run(line)
-        _set_font(body_run, size=8.4)
+        _set_font(body_run, size=8)
     _clear_table_borders(table)
 
 
@@ -591,9 +596,9 @@ def _add_conditions(document: Document, totals: dict[str, Any], data: dict[str, 
         "CONDITIONS COMMERCIALES & VALIDATION",
         bold=True,
         color=IVT_ORANGE_DARK,
-        size=16,
+        size=14,
         alignment=WD_ALIGN_PARAGRAPH.CENTER,
-        after=8,
+        after=6,
     )
     _add_amount_in_words(document, totals["total_ttc"])
 
@@ -616,7 +621,8 @@ def _add_conditions(document: Document, totals: dict[str, Any], data: dict[str, 
         "CODE SWIFT : SGCI CIAB",
     )
 
-    _add_spacer(document, 32)
+    # 2 rem at a 16 px root size corresponds to 24 print points.
+    _add_spacer(document, 24)
     signature_table = document.add_table(rows=1, cols=2)
     _set_table_width(signature_table)
     signature_table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -624,14 +630,14 @@ def _add_conditions(document: Document, totals: dict[str, Any], data: dict[str, 
     _cell_text(
         signature_table.rows[0].cells[0],
         "POUR LE CLIENT\nNom, signature et cachet\nMention « Bon pour Accord »",
-        size=8.2,
+        size=8,
         alignment=WD_ALIGN_PARAGRAPH.CENTER,
         margins=(0, 0, 0, 0),
     )
     _cell_text(
         signature_table.rows[0].cells[1],
         "POUR IVOIR TRIPS INTERNATIONAL\nDirection Générale\nSignature et cachet",
-        size=8.2,
+        size=8,
         alignment=WD_ALIGN_PARAGRAPH.CENTER,
         margins=(0, 0, 0, 0),
     )
@@ -641,7 +647,7 @@ def _add_conditions(document: Document, totals: dict[str, Any], data: dict[str, 
         signature_path = ASSETS_DIR / "signature.png"
     if signature_path.is_file():
         paragraph = signature_table.rows[0].cells[1].add_paragraph()
-        _format_paragraph(paragraph, alignment=WD_ALIGN_PARAGRAPH.CENTER, before=8)
+        _format_paragraph(paragraph, alignment=WD_ALIGN_PARAGRAPH.CENTER, before=3)
         paragraph.add_run().add_picture(str(signature_path), width=Mm(60))
         signature_table.rows[0].cells[0].vertical_alignment = WD_ALIGN_VERTICAL.TOP
         signature_table.rows[0].cells[1].vertical_alignment = WD_ALIGN_VERTICAL.TOP
@@ -655,7 +661,7 @@ def _add_control_line(
     agency_fee_label: str,
     vat_rate: Decimal,
 ) -> None:
-    _add_spacer(document, 40)
+    _add_spacer(document, 12)
     control_line = (
         f"Contrôle des calculs : sous-total mise en œuvre = {_format_fcfa(totals['sous_total_ht'])} ; "
         f"{agency_fee_label} = {_format_fcfa(totals['frais_agence'])} ; "
@@ -704,7 +710,7 @@ def generate_proforma_word(data: dict[str, Any], output_dir: str | Path | None =
     _set_document_defaults(document)
     _add_document_header(document, data, reference)
     _add_services_table(document, sections)
-    _add_spacer(document, 12)
+    _add_spacer(document, 8)
     _add_financial_summary(document, totals, agency_fee_label, vat_rate)
     _add_conditions(document, totals, data)
     _add_control_line(document, totals, agency_fee_label, vat_rate)

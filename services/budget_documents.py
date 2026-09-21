@@ -144,8 +144,6 @@ def _budget_notes(data: dict[str, Any]) -> list[str]:
         "Jus/Sucrerie : 2 canettes par personne",
         "Bière : 2 bouteilles par personne",
         "Vin : 1 bouteille pour 4 personnes",
-        "Droit de bouchon vin : 5 000",
-        "Droit de bouchon champagne : 10 000",
     ]
 
 
