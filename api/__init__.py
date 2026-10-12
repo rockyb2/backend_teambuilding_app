@@ -42,6 +42,7 @@ from api.uploads import router as uploads_router
 from api.agent.routes import router as agent_router
 from api.contact_akan.routes import router as contact_akan_router
 from api.events import router as events_router
+from api.taxes import router as taxes_router
 
 
 
@@ -87,5 +88,6 @@ def include_api_routes(app):
     app.include_router(agent_router)
     app.include_router(contact_akan_router)
     app.include_router(events_router)
+    app.include_router(taxes_router)
 
 

@@ -427,6 +427,10 @@ def create_tables():
             "offre_tourisme_id": (
                 "INTEGER NULL REFERENCES offre_tourisme(id) ON DELETE SET NULL"
             ),
+            "taxes_selectionnees": "JSONB NOT NULL DEFAULT '[]'::jsonb",
+            "nombre_nuitees": "INTEGER NOT NULL DEFAULT 0",
+            "nombre_chambres": "INTEGER NOT NULL DEFAULT 0",
+            "total_taxes": "NUMERIC(14, 2) NOT NULL DEFAULT 0",
         },
         "materiel": {
             "marque": "VARCHAR(100) NULL",
@@ -435,6 +439,10 @@ def create_tables():
         "budgets": {
             "mode_frais_agence": "VARCHAR(20) NOT NULL DEFAULT 'montant'",
             "groupe_reference": "VARCHAR(50) NULL",
+            "taxes_selectionnees": "JSONB NOT NULL DEFAULT '[]'::jsonb",
+            "nombre_nuitees": "INTEGER NOT NULL DEFAULT 0",
+            "nombre_chambres": "INTEGER NOT NULL DEFAULT 0",
+            "total_taxes": "NUMERIC(14, 2) NOT NULL DEFAULT 0",
         },
         "depense": {
             "pole": "VARCHAR(30) NOT NULL DEFAULT 'teambuilding'",
@@ -444,6 +452,7 @@ def create_tables():
             "facture_id": (
                 "INTEGER NULL REFERENCES facture(id) ON DELETE SET NULL"
             ),
+            "facture_ligne_cle": "VARCHAR(80) NULL",
             "demande_team_building_id": (
                 "INTEGER NULL REFERENCES demandes_team_building(id) ON DELETE SET NULL"
             ),
@@ -453,6 +462,10 @@ def create_tables():
             "demande_tourisme_custom_id": (
                 "INTEGER NULL REFERENCES demandes_tourisme_custom(id) ON DELETE SET NULL"
             ),
+        },
+        "facture": {
+            "frais_agence": "NUMERIC(14, 2) NULL",
+            "proforma_snapshot": "JSONB NOT NULL DEFAULT '{}'::jsonb",
         },
         "tarifs_transport": {
             "vehicule_id": "INTEGER NULL",
@@ -499,3 +512,11 @@ def create_tables():
         if connection.dialect.name == "postgresql":
             migration = Path(__file__).parent / "sql" / "2026_09_09_budget_multi_sites.sql"
             connection.execute(text(migration.read_text(encoding="utf-8")))
+            finance_migration = Path(__file__).parent / "sql" / "2026_09_23_facture_frais_agence.sql"
+            connection.execute(text(finance_migration.read_text(encoding="utf-8")))
+            taxes_migration = Path(__file__).parent / "sql" / "2026_10_05_create_taxes.sql"
+            connection.exec_driver_sql(taxes_migration.read_text(encoding="utf-8"))
+            room_tax_migration = Path(__file__).parent / "sql" / "2026_10_07_tax_per_room.sql"
+            connection.exec_driver_sql(room_tax_migration.read_text(encoding="utf-8"))
+            hotel_vat_migration = Path(__file__).parent / "sql" / "2026_10_08_hotel_vat.sql"
+            connection.exec_driver_sql(hotel_vat_migration.read_text(encoding="utf-8"))

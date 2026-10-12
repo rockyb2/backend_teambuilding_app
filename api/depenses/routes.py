@@ -78,6 +78,21 @@ def _validate_depense_relations(db: Session, data: dict):
                 detail="Le pôle de la dépense doit correspondre au pôle de la facture",
             )
 
+    line_key = str(data.get("facture_ligne_cle") or "").strip()
+    if line_key:
+        facture_id = data.get("facture_id")
+        if facture_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Un poste facturé doit être lié à une facture",
+            )
+        facture = crud_facture.get_facture(db, facture_id)
+        if not facture or line_key not in crud_facture.get_facture_line_keys(facture):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Le poste facturé sélectionné n'existe pas sur cette facture",
+            )
+
     if data.get("demande_team_building_id") is not None:
         if pole != "teambuilding":
             raise HTTPException(
@@ -119,6 +134,7 @@ def _depense_context(db_depense) -> dict:
         "activite_id": db_depense.activite_id,
         "proforma_id": db_depense.proforma_id,
         "facture_id": db_depense.facture_id,
+        "facture_ligne_cle": db_depense.facture_ligne_cle,
         "demande_team_building_id": db_depense.demande_team_building_id,
         "demande_tourisme_id": db_depense.demande_tourisme_id,
         "demande_tourisme_custom_id": db_depense.demande_tourisme_custom_id,

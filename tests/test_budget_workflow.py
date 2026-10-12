@@ -205,8 +205,30 @@ class BudgetWorkflowTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             proformas.create_proforma(self.db, ProformaCreate(**values))
         values["budget_id"] = None
-        with self.assertRaises(ValueError):
-            proformas.create_proforma(self.db, ProformaCreate(**values))
+        manual = proformas.create_proforma(self.db, ProformaCreate(**values))
+        self.assertIsNone(manual.budget_id)
+        self.assertEqual(manual.budget_snapshot, {})
+
+    def test_proforma_can_be_created_without_budget(self):
+        proforma = proformas.create_proforma(self.db, ProformaCreate(
+            pole="teambuilding",
+            client="Client sans budget",
+            nombre_personnes=12,
+            objet="Team building sur mesure",
+            date_proforma=date(2026, 9, 9),
+            sections=[{
+                "nom": "Activités",
+                "prestations": [{
+                    "designation": "Animation",
+                    "nombre_jours": 1,
+                    "quantite": 12,
+                    "prix_unitaire": 10000,
+                }],
+            }],
+        ))
+        self.assertIsNone(proforma.budget_id)
+        self.assertEqual(proforma.budget_snapshot, {})
+        self.assertEqual(proforma.frais_agence, Decimal("21000"))
 
     def test_group_excel_and_individual_pdf_regeneration(self):
         members = budgets.create_multi_site_budgets(self.db, [self.payload(), self.payload(2)])

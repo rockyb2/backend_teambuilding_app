@@ -14,6 +14,7 @@ from services.budget_documents import (
     BASE_DIR, calculate_budget_totals, generate_budget_excel, generate_budget_pdf,
     generate_multi_site_budget_excel,
 )
+from services.taxes import calculate_taxes
 
 
 BUDGET_REFERENCE_PREFIX = "BUD"
@@ -95,7 +96,7 @@ def generate_budget_reference(db: Session, created_at: datetime | None = None) -
     return f"{prefix}{highest_rank + 1:04d}"
 
 
-def _prepare_values(values: dict) -> dict:
+def _prepare_values(db: Session, values: dict) -> dict:
     values["date_budget"] = values.get("date_budget") or date.today()
     totals = calculate_budget_totals(
         values.get("sections") or [],
@@ -111,6 +112,10 @@ def _prepare_values(values: dict) -> dict:
     values["tva_frais_agence"] = totals["tva_frais_agence"]
     values["total_ht"] = totals["total_ht"]
     values["total_ttc"] = totals["total_ttc"]
+    tax_details, tax_total = calculate_taxes(db, values.get("taxes_selectionnees"), totals["total_ht"], values.get("nombre_chambres"), values.get("nombre_nuitees"), totals["sections"])
+    values["taxes_selectionnees"] = tax_details
+    values["total_taxes"] = tax_total
+    values["total_ttc"] = totals["total_ttc"] + tax_total
     values["options_selectionnees"] = values.get("options_selectionnees") or {}
     return values
 
@@ -136,7 +141,7 @@ def create_budget(
     commit: bool = True,
     groupe_reference: str | None = None,
 ) -> Budget:
-    values = _prepare_values(_model_dump(payload))
+    values = _prepare_values(db, _model_dump(payload))
     if values.get("statut") == "valide":
         raise ValueError("Utilisez l'action Valider pour retenir un budget.")
     lock_offer(db, values["offre_id"])
@@ -172,7 +177,7 @@ def update_budget(db: Session, db_budget: Budget, payload: BudgetUpdate | dict) 
     values.update(updates)
     if db_budget.statut == "valide" and any(key != "statut" for key in updates):
         values["statut"] = "brouillon"
-    values = _prepare_values(values)
+    values = _prepare_values(db, values)
     for key, value in values.items():
         if hasattr(db_budget, key):
             setattr(db_budget, key, value)
@@ -208,6 +213,10 @@ def budget_document_data(db_budget: Budget) -> dict:
         "frais_agence": db_budget.frais_agence,
         "mode_frais_agence": db_budget.mode_frais_agence,
         "taux_tva_frais_agence": db_budget.taux_tva_frais_agence,
+        "taxes_selectionnees": db_budget.taxes_selectionnees,
+        "nombre_nuitees": db_budget.nombre_nuitees,
+        "nombre_chambres": db_budget.nombre_chambres,
+        "total_taxes": db_budget.total_taxes,
         "modalite_paiement": db_budget.modalite_paiement,
         "notes": db_budget.notes,
         "statut": db_budget.statut,

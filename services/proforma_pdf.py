@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from services.agency_fees import resolve_agency_fee_rate
+from services.taxes import add_persisted_taxes
 
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -497,6 +498,10 @@ def normalize_sections(sections: list[dict[str, Any]]) -> tuple[list[dict[str, A
                     "unite": str(item.get("unite") or "").strip(),
                     "prix_unitaire": int(unit_price),
                     "montant_ht": int(line_total),
+                    "prestation_hoteliere": item.get("prestation_hoteliere") is True,
+                    "prix_est_ttc": item.get("prix_est_ttc") is True,
+                    "montant_saisi": item.get("montant_saisi"),
+                    "prix_unitaire_saisi": item.get("prix_unitaire_saisi"),
                 }
             )
             section_total += line_total
@@ -570,6 +575,7 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
         data.get("taux_tva_frais_agence") if data.get("taux_tva_frais_agence") is not None else 18,
         agency_fee_rate=agency_fee_rate,
     )
+    totals = add_persisted_taxes(totals, data)
     sections = totals["sections"]
     if not sections:
         raise ValueError("La proforma doit contenir au moins une prestation.")
@@ -761,6 +767,14 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
             _paragraph(_format_fcfa(totals["total_ttc"]), styles["right_white_bold"]),
         ],
     ]
+    financial_rows[-1:-1] = [
+        [
+            "",
+            _paragraph(str(taxe.get("nom") or taxe.get("code") or "Taxe"), styles["summary_label"]),
+            _paragraph(_format_fcfa(taxe["montant"]), styles["summary_amount"]),
+        ]
+        for taxe in totals["taxes_selectionnees"]
+    ]
     financial_table = Table(
         financial_rows,
         colWidths=[75 * mm, 67 * mm, 34 * mm],
@@ -776,7 +790,7 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
                 ("VALIGN", (0, 0), (0, 0), "TOP"),
                 ("BACKGROUND", (1, 2), (2, 3), IVT_ORANGE_SOFT),
-                ("BACKGROUND", (1, 4), (2, 4), IVT_ORANGE_DARK),
+                ("BACKGROUND", (1, -1), (2, -1), IVT_ORANGE_DARK),
             ]
         )
     )

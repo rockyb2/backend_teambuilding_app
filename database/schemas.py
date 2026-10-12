@@ -168,6 +168,36 @@ class OffreRead(OffreBase):
     updated_at: datetime
 
 
+class TaxeBase(ORMBaseModel):
+    nom: str
+    code: str
+    type_calcul: Literal["pourcentage", "pourcentage_lignes", "forfait_chambre_nuit"]
+    taux: Optional[Decimal] = Field(default=None, ge=0)
+    bareme: list[dict[str, Any]] = Field(default_factory=list)
+    actif: bool = True
+    description: Optional[str] = None
+
+
+class TaxeCreate(TaxeBase):
+    pass
+
+
+class TaxeUpdate(ORMBaseModel):
+    nom: Optional[str] = None
+    code: Optional[str] = None
+    type_calcul: Optional[Literal["pourcentage", "pourcentage_lignes", "forfait_chambre_nuit"]] = None
+    taux: Optional[Decimal] = Field(default=None, ge=0)
+    bareme: Optional[list[dict[str, Any]]] = None
+    actif: Optional[bool] = None
+    description: Optional[str] = None
+
+
+class TaxeRead(TaxeBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+
 ProformaStatut = Literal["brouillon", "validee", "pdf_genere", "annulee"]
 ProformaPole = Literal["teambuilding", "tourisme"]
 
@@ -192,6 +222,9 @@ class ProformaBase(ORMBaseModel):
     date_proforma: date
     date_evenement: Optional[date] = None
     sections: list[dict[str, Any]] = Field(default_factory=list)
+    taxes_selectionnees: list[dict[str, Any]] = Field(default_factory=list)
+    nombre_nuitees: int = Field(default=0, ge=0)
+    nombre_chambres: int = Field(default=0, ge=0)
     frais_agence: Decimal = Decimal("0")
     details_frais_agence: list[str] = Field(default_factory=list)
     taux_tva_frais_agence: Decimal = Decimal("18")
@@ -225,6 +258,9 @@ class ProformaUpdate(ORMBaseModel):
     frais_agence: Optional[Decimal] = None
     details_frais_agence: Optional[list[str]] = None
     taux_tva_frais_agence: Optional[Decimal] = None
+    taxes_selectionnees: Optional[list[dict[str, Any]]] = None
+    nombre_nuitees: Optional[int] = Field(default=None, ge=0)
+    nombre_chambres: Optional[int] = Field(default=None, ge=0)
     modalite_paiement: Optional[str] = None
     recommandations: Optional[list[dict[str, Any]]] = None
     notes: Optional[str] = None
@@ -238,6 +274,7 @@ class ProformaRead(ProformaBase):
     sous_total_ht: Decimal
     tva_frais_agence: Decimal
     total_ttc: Decimal
+    total_taxes: Decimal = Decimal("0")
     fichier_pdf: Optional[str] = None
     created_by_id: Optional[int] = None
     created_at: datetime
@@ -295,6 +332,7 @@ class FactureBase(ORMBaseModel):
     objet: Optional[str] = None
     date_facture: Optional[date] = None
     montant_facture: Decimal = Decimal("0")
+    frais_agence: Optional[Decimal] = Field(default=None, ge=0)
 
 
 class FactureCreate(FactureBase):
@@ -312,6 +350,7 @@ class FactureUpdate(ORMBaseModel):
     objet: Optional[str] = None
     date_facture: Optional[date] = None
     montant_facture: Optional[Decimal] = None
+    frais_agence: Optional[Decimal] = Field(default=None, ge=0)
     statut: Optional[FactureStatut] = None
 
 
@@ -321,6 +360,7 @@ class FactureRead(FactureBase):
     statut: FactureStatut
     total_paye: Decimal
     reste_a_payer: Decimal
+    proforma_snapshot: dict[str, Any] = Field(default_factory=dict)
     created_by_id: Optional[int] = None
     updated_by_id: Optional[int] = None
     created_at: datetime
@@ -958,6 +998,9 @@ class BudgetBase(ORMBaseModel):
     devise: str = "XOF"
     sections: list[dict[str, Any]] = Field(default_factory=list)
     options_selectionnees: dict[str, Any] = Field(default_factory=dict)
+    taxes_selectionnees: list[dict[str, Any]] = Field(default_factory=list)
+    nombre_nuitees: int = Field(default=0, ge=0)
+    nombre_chambres: int = Field(default=0, ge=0)
     frais_agence: Decimal = Field(default=Decimal("0"), ge=0)
     taux_tva_frais_agence: Decimal = Field(default=Decimal("0"), ge=0)
     modalite_paiement: Optional[str] = None
@@ -993,6 +1036,9 @@ class BudgetUpdate(ORMBaseModel):
     options_selectionnees: Optional[dict[str, Any]] = None
     frais_agence: Optional[Decimal] = Field(default=None, ge=0)
     taux_tva_frais_agence: Optional[Decimal] = Field(default=None, ge=0)
+    taxes_selectionnees: Optional[list[dict[str, Any]]] = None
+    nombre_nuitees: Optional[int] = Field(default=None, ge=0)
+    nombre_chambres: Optional[int] = Field(default=None, ge=0)
     modalite_paiement: Optional[str] = None
     notes: Optional[str] = None
     statut: Optional[BudgetStatut] = None
@@ -1006,6 +1052,7 @@ class BudgetRead(BudgetBase):
     tva_frais_agence: Decimal
     total_ht: Decimal
     total_ttc: Decimal
+    total_taxes: Decimal = Decimal("0")
     fichier_pdf: Optional[str] = None
     fichier_excel: Optional[str] = None
     created_by_id: Optional[int] = None
@@ -1024,6 +1071,7 @@ class DepenseBase(ORMBaseModel):
     activite_id: Optional[int] = None
     proforma_id: Optional[int] = None
     facture_id: Optional[int] = None
+    facture_ligne_cle: Optional[str] = Field(default=None, max_length=80)
     demande_team_building_id: Optional[int] = None
     demande_tourisme_id: Optional[int] = None
     demande_tourisme_custom_id: Optional[int] = None
@@ -1049,6 +1097,7 @@ class DepenseUpdate(ORMBaseModel):
     activite_id: Optional[int] = None
     proforma_id: Optional[int] = None
     facture_id: Optional[int] = None
+    facture_ligne_cle: Optional[str] = Field(default=None, max_length=80)
     demande_team_building_id: Optional[int] = None
     demande_tourisme_id: Optional[int] = None
     demande_tourisme_custom_id: Optional[int] = None

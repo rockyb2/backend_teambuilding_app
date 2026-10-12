@@ -150,6 +150,12 @@ def get_paiement(paiement_id: int, db: Session = Depends(get_db)):
     return _get_paiement_or_404(db, paiement_id)
 
 
+@router.get("/{facture_id}/comparatif")
+def get_facture_comparatif(facture_id: int, db: Session = Depends(get_db)):
+    """Comparer les postes facturés aux achats réellement enregistrés."""
+    return crud_facture.get_facture_comparatif(db, _get_facture_or_404(db, facture_id))
+
+
 @router.put("/paiements/{paiement_id}", response_model=PaiementRead)
 def update_paiement(
     paiement_id: int,

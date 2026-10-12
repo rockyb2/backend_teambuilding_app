@@ -22,6 +22,7 @@ from services.proforma_pdf import (
 )
 from services.proforma_word import generate_proforma_word, get_proforma_word_path, is_proforma_word_current
 from services.agency_fees import resolve_agency_fee_rate
+from services.taxes import calculate_taxes
 
 
 PROFORMA_REFERENCE_PREFIX = "PRO"
@@ -127,7 +128,7 @@ def generate_proforma_reference(db: Session, created_at: datetime | None = None)
     return f"{prefix}{highest_rank + 1:04d}"
 
 
-def _prepare_values(values: dict) -> dict:
+def _prepare_values(values: dict, db: Session | None = None) -> dict:
     sections = values.get("sections") or []
     vat_rate = values.get("taux_tva_frais_agence")
     if vat_rate is None:
@@ -152,6 +153,10 @@ def _prepare_values(values: dict) -> dict:
     values["sous_total_ht"] = totals["sous_total_ht"]
     values["tva_frais_agence"] = totals["tva_frais_agence"]
     values["total_ttc"] = totals["total_ttc"]
+    tax_details, tax_total = calculate_taxes(db, values.get("taxes_selectionnees"), totals["total_ht"], values.get("nombre_chambres"), values.get("nombre_nuitees"), totals["sections"]) if db else (values.get("taxes_selectionnees") or [], Decimal("0"))
+    values["taxes_selectionnees"] = tax_details
+    values["total_taxes"] = tax_total
+    values["total_ttc"] = Decimal(str(values["total_ttc"])) + tax_total
     values["details_frais_agence"] = values.get("details_frais_agence") or []
     values["client_details"] = (
         values.get("client_details")
@@ -193,6 +198,9 @@ def build_proforma_from_budget(db: Session, budget_id: int) -> dict:
         "sections": deepcopy(budget.sections), "frais_agence": budget.frais_agence,
         "mode_frais_agence": budget.mode_frais_agence,
         "taux_tva_frais_agence": budget.taux_tva_frais_agence,
+        "taxes_selectionnees": deepcopy(budget.taxes_selectionnees),
+        "nombre_nuitees": budget.nombre_nuitees,
+        "nombre_chambres": budget.nombre_chambres,
         "details_frais_agence": [], "modalite_paiement": budget.modalite_paiement,
         "notes": budget.notes, "recommandations": [], "statut": "validee",
     }
@@ -211,7 +219,10 @@ def _attach_budget(db: Session, values: dict, existing: Proforma | None = None) 
         values["budget_snapshot"] = deepcopy(existing.budget_snapshot)
         return values
     if not budget_id:
-        raise ValueError("Sélectionnez le budget validé de l'offre pour créer la proforma.")
+        if existing and existing.budget_id:
+            raise ValueError("Le budget d'origine d'une proforma existante ne peut pas être retiré.")
+        values["budget_snapshot"] = {}
+        return values
     budget = _validated_budget(db, budget_id)
     if values.get("mode_frais_agence") is None:
         values["mode_frais_agence"] = budget.mode_frais_agence
@@ -231,7 +242,7 @@ def create_proforma(
     payload: ProformaCreate,
     created_by_id: int | None = None,
 ) -> Proforma:
-    values = _prepare_values(_attach_budget(db, _model_dump(payload)))
+    values = _prepare_values(_attach_budget(db, _model_dump(payload)), db)
     values["reference"] = generate_proforma_reference(db)
     values["created_by_id"] = created_by_id
 
@@ -317,7 +328,7 @@ def create_tourism_proforma_from_offer(
     db_offre: OffreTourisme,
     created_by_id: int | None = None,
 ) -> Proforma:
-    values = _prepare_values(build_tourism_proforma_values(db_offre))
+    values = _prepare_values(build_tourism_proforma_values(db_offre), db)
     values["reference"] = generate_proforma_reference(db)
     values["created_by_id"] = created_by_id
 
@@ -337,7 +348,7 @@ def update_proforma(db: Session, db_proforma: Proforma, payload: ProformaUpdate 
     }
     values.update(updates)
     values = _attach_budget(db, values, db_proforma)
-    values = _prepare_values(values)
+    values = _prepare_values(values, db)
     for key, value in values.items():
         if hasattr(db_proforma, key):
             setattr(db_proforma, key, value)
@@ -372,6 +383,10 @@ def _document_data(db_proforma: Proforma) -> dict:
         "mode_frais_agence": db_proforma.mode_frais_agence,
         "details_frais_agence": db_proforma.details_frais_agence,
         "taux_tva_frais_agence": db_proforma.taux_tva_frais_agence,
+        "taxes_selectionnees": db_proforma.taxes_selectionnees,
+        "nombre_nuitees": db_proforma.nombre_nuitees,
+        "nombre_chambres": db_proforma.nombre_chambres,
+        "total_taxes": db_proforma.total_taxes,
         "modalite_paiement": db_proforma.modalite_paiement,
         "notes": db_proforma.notes,
     }

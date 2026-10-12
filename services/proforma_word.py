@@ -4,6 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from services.agency_fees import resolve_agency_fee_rate
+from services.taxes import add_persisted_taxes
 
 from docx import Document
 from docx.enum.table import WD_ALIGN_VERTICAL, WD_TABLE_ALIGNMENT
@@ -503,13 +504,6 @@ def _add_financial_summary(
     agency_fee_label: str,
     vat_rate: Decimal,
 ) -> None:
-    table = document.add_table(rows=5, cols=3)
-    _set_table_width(table)
-    table.alignment = WD_TABLE_ALIGNMENT.CENTER
-    widths = [Mm(75), Mm(67), Mm(34)]
-    for row in table.rows:
-        _apply_column_widths(row, widths)
-
     rows = [
         ("RÉCAPITULATIF FINANCIER", "Sous-total mise en œuvre", totals["sous_total_ht"]),
         ("", agency_fee_label, totals["frais_agence"]),
@@ -517,6 +511,16 @@ def _add_financial_summary(
         ("", f"TVA {format(vat_rate.normalize(), 'f')} % sur frais d’agence", totals["tva_frais_agence"]),
         ("", "TOTAL TTC", totals["total_ttc"]),
     ]
+    rows[-1:-1] = [
+        ("", str(taxe.get("nom") or taxe.get("code") or "Taxe"), taxe["montant"])
+        for taxe in totals.get("taxes_selectionnees", [])
+    ]
+    table = document.add_table(rows=len(rows), cols=3)
+    _set_table_width(table)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    widths = [Mm(75), Mm(67), Mm(34)]
+    for row in table.rows:
+        _apply_column_widths(row, widths)
     for row_index, (title, label, amount) in enumerate(rows):
         row = table.rows[row_index]
         title_size = 14 if title else 8
@@ -529,7 +533,7 @@ def _add_financial_summary(
             margins=(40, 0, 40, 0),
         )
 
-        is_total_row = row_index == 4
+        is_total_row = row_index == len(rows) - 1
         is_highlight_row = row_index in (2, 3)
         fill = IVT_ORANGE_DARK if is_total_row else IVT_ORANGE_SOFT if is_highlight_row else None
         text_color = "FFFFFF" if is_total_row else IVT_INK
@@ -692,6 +696,7 @@ def generate_proforma_word(data: dict[str, Any], output_dir: str | Path | None =
         data.get("taux_tva_frais_agence") if data.get("taux_tva_frais_agence") is not None else 18,
         agency_fee_rate=agency_fee_rate,
     )
+    totals = add_persisted_taxes(totals, data)
     sections = totals["sections"]
     if not sections:
         raise ValueError("La proforma doit contenir au moins une prestation.")

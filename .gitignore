@@ -7,6 +7,10 @@
 venv/
 .venv/
 env/
+
+# Automatisation Zoho locale (ne pas publier avec l'application)
+.zoho_tokens.json
+agentautomatisation/agentEmail/
 backendenv/
 teambuidingenv/
 

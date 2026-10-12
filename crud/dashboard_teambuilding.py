@@ -3,7 +3,8 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
-from database.models import Activite, DemandeTeamBuilding, Depense, Materiel, Offre
+from database.models import Activite, DemandeTeamBuilding, Materiel, Offre
+from crud.finance import get_finance_kpis
 
 
 ACTIVE_ACTIVITY_STATUSES = ("planifier", "en_preparation", "en_cours")
@@ -199,7 +200,7 @@ def _build_priorities(
     return priorities[:12]
 
 
-def get_dashboard(db: Session) -> dict:
+def get_dashboard(db: Session, include_financials: bool = True) -> dict:
     now = datetime.now()
     today = now.date()
 
@@ -214,16 +215,7 @@ def get_dashboard(db: Session) -> dict:
         .all()
     )
 
-    validated_revenue = _money(
-        db.query(func.coalesce(func.sum(Offre.montant_total), 0))
-        .filter(Offre.statut == "validee")
-        .scalar()
-    )
-    total_expenses = _money(
-        db.query(func.coalesce(func.sum(Depense.montant), 0))
-        .filter(Depense.pole == "teambuilding")
-        .scalar()
-    )
+    finance = get_finance_kpis(db, pole="teambuilding") if include_financials else None
     eligible_offers = db.query(Offre).filter(
         Offre.statut.in_(("envoyee", "validee", "refusee", "expiree"))
     ).count()
@@ -247,11 +239,17 @@ def get_dashboard(db: Session) -> dict:
         "offres_en_attente": db.query(Offre).filter(Offre.statut == "envoyee").count(),
         "activites_a_venir": int(upcoming_count or 0),
         "participants_prevus": int(upcoming_participants or 0),
-        "chiffre_affaires_valide": validated_revenue,
-        "depenses_totales": total_expenses,
-        "marge_estimee": validated_revenue - total_expenses,
         "taux_conversion": round((validated_offers / eligible_offers) * 100, 1) if eligible_offers else 0,
     }
+    if finance:
+        stats.update({
+            "chiffre_affaires_valide": finance["total"]["ca_global"],
+            "chiffre_affaires_global": finance["total"]["ca_global"],
+            "chiffre_affaires_reel": finance["total"]["ca_reel"],
+            "depenses_totales": finance["total"]["depenses"],
+            "marge_estimee": finance["total"]["benefice"],
+            "taux_marge": finance["total"]["taux_benefice"],
+        })
 
     month_buckets = _last_six_months(today)
     month_start = datetime.combine(month_buckets[0]["start"], datetime.min.time())
@@ -372,6 +370,7 @@ def get_dashboard(db: Session) -> dict:
     return {
         "generated_at": now,
         "stats": stats,
+        "finance": finance,
         "priorities": _build_priorities(db, upcoming_activities, low_stock, today),
         "monthly_activity": monthly_activity,
         "monthly_requests": monthly_requests_summary,

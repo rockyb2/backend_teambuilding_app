@@ -18,6 +18,7 @@ from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from services.agency_fees import resolve_agency_fee_rate
+from services.taxes import add_persisted_taxes
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -281,6 +282,10 @@ def normalize_budget_sections(sections: list[dict[str, Any]]) -> tuple[list[dict
                     "prix_unitaire": int(unit_price),
                     "montant_ht": int(line_total),
                     "source": str(item.get("source") or "").strip(),
+                    "prestation_hoteliere": item.get("prestation_hoteliere") is True,
+                    "prix_est_ttc": item.get("prix_est_ttc") is True,
+                    "montant_saisi": item.get("montant_saisi"),
+                    "prix_unitaire_saisi": item.get("prix_unitaire_saisi"),
                 }
             )
             section_total += line_total
@@ -366,6 +371,7 @@ def generate_budget_pdf(data: dict[str, Any], output_dir: str | Path | None = No
         data.get("taux_tva_frais_agence") or 0,
         data.get("mode_frais_agence") or "montant",
     )
+    totals = add_persisted_taxes(totals, data)
     sections = totals["sections"]
     if not sections:
         raise ValueError("Le budget doit contenir au moins une ligne.")
@@ -475,8 +481,9 @@ def generate_budget_pdf(data: dict[str, Any], output_dir: str | Path | None = No
         ("Sous-total prestations", totals["sous_total_ht"]),
         ("Frais d'agence (17,5 %)" if totals["mode_frais_agence"] == "pourcentage" else "Frais d'agence", totals["frais_agence"]),
         (f"TVA frais d'agence {format(totals['taux_tva_frais_agence'].normalize(), 'f')}%", totals["tva_frais_agence"]),
-        ("Total estimatif", totals["total_ttc"]),
     ]
+    summary_rows.extend((str(taxe.get("nom") or taxe.get("code") or "Taxe"), taxe["montant"]) for taxe in totals["taxes_selectionnees"])
+    summary_rows.append(("Total estimatif", totals["total_ttc"]))
     for label, value in summary_rows:
         row_index = len(rows)
         rows.append(["", "", "", _paragraph(label, styles["section"]), _paragraph(_format_fcfa(value), styles["right_bold"])])
@@ -514,6 +521,7 @@ def _append_budget_sheet(workbook: Workbook, data: dict[str, Any]) -> dict[str, 
         data.get("taux_tva_frais_agence") or 0,
         data.get("mode_frais_agence") or "montant",
     )
+    totals = add_persisted_taxes(totals, data)
     sections = totals["sections"]
     if not sections:
         raise ValueError("Le budget doit contenir au moins une ligne.")
@@ -772,16 +780,25 @@ def _append_budget_sheet(workbook: Workbook, data: dict[str, Any]) -> dict[str, 
     sheet.cell(row=vat_row, column=6, value=f"=ROUND(F{agency_amount_row}*{vat_rate}/100,0)")
     current_row += 1
 
+    tax_rows = []
+    for taxe in totals.get("taxes_selectionnees", []):
+        tax_row = current_row
+        tax_rows.append(tax_row)
+        sheet.cell(row=tax_row, column=4, value=str(taxe.get("nom") or taxe.get("code") or "Taxe"))
+        sheet.cell(row=tax_row, column=6, value=float(taxe.get("montant") or 0))
+        current_row += 1
+
     total_ttc_row = current_row
     sheet.cell(row=total_ttc_row, column=4, value="TOTAL TTC")
-    sheet.cell(row=total_ttc_row, column=6, value=f"=F{total_ht_row}+F{vat_row}")
+    taxes_formula = f"+SUM(F{tax_rows[0]}:F{tax_rows[-1]})" if tax_rows else ""
+    sheet.cell(row=total_ttc_row, column=6, value=f"=F{total_ht_row}+F{vat_row}{taxes_formula}")
     current_row += 1
 
     total_person_row = current_row
     sheet.cell(row=total_person_row, column=4, value="TOTAL TTC / PERSONNE")
     sheet.cell(row=total_person_row, column=6, value=f"=F{total_ttc_row}/{participants}")
 
-    for row_index in (total_ht_row, vat_row, total_ttc_row, total_person_row):
+    for row_index in (total_ht_row, vat_row, *tax_rows, total_ttc_row, total_person_row):
         for column_index in range(4, 7):
             cell = sheet.cell(row=row_index, column=column_index)
             cell.font = body_bold

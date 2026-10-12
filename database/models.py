@@ -825,6 +825,10 @@ class Depense(Base):
             ")",
             name="ck_depense_mode_paiement",
         ),
+        CheckConstraint(
+            "facture_ligne_cle IS NULL OR facture_id IS NOT NULL",
+            name="ck_depense_ligne_facture_requiert_facture",
+        ),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -850,6 +854,7 @@ class Depense(Base):
     activite_id = Column(Integer, ForeignKey("activite.id", ondelete="SET NULL"), nullable=True, index=True)
     proforma_id = Column(Integer, ForeignKey("proformas.id", ondelete="SET NULL"), nullable=True, index=True)
     facture_id = Column(Integer, ForeignKey("facture.id", ondelete="SET NULL"), nullable=True, index=True)
+    facture_ligne_cle = Column(String(80), nullable=True, index=True)
     demande_team_building_id = Column(
         Integer,
         ForeignKey("demandes_team_building.id", ondelete="SET NULL"),
@@ -1027,6 +1032,21 @@ class Materiel(Base):
     )
 
 
+class Taxe(Base):
+    __tablename__ = "taxes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nom = Column(String(150), nullable=False)
+    code = Column(String(50), nullable=False, unique=True, index=True)
+    type_calcul = Column(String(30), nullable=False)  # pourcentage | pourcentage_lignes | forfait_chambre_nuit
+    taux = Column(Numeric(7, 4), nullable=True)
+    bareme = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    actif = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+
 class Proforma(Base):
     __tablename__ = "proformas"
     __table_args__ = (
@@ -1100,6 +1120,10 @@ class Proforma(Base):
     date_proforma = Column(Date, nullable=False)
     date_evenement = Column(Date, nullable=True)
     sections = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    taxes_selectionnees = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    nombre_nuitees = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    nombre_chambres = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    total_taxes = Column(Numeric(14, 2), nullable=False, default=0, server_default=text("0"))
     frais_agence = Column(Numeric(14, 2), nullable=False, default=0, server_default=text("0"))
     details_frais_agence = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     taux_tva_frais_agence = Column(Numeric(5, 2), nullable=False, default=18, server_default=text("18"))
@@ -1187,12 +1211,16 @@ class Budget(Base):
     devise = Column(String(10), nullable=False, default="XOF", server_default=text("'XOF'"))
     sections = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     options_selectionnees = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    taxes_selectionnees = Column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    nombre_nuitees = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    nombre_chambres = Column(Integer, nullable=False, default=0, server_default=text("0"))
     frais_agence = Column(Numeric(14, 2), nullable=False, default=0, server_default=text("0"))
     taux_tva_frais_agence = Column(Numeric(5, 2), nullable=False, default=0, server_default=text("0"))
     sous_total_ht = Column(Numeric(14, 2), nullable=False, default=0, server_default=text("0"))
     tva_frais_agence = Column(Numeric(14, 2), nullable=False, default=0, server_default=text("0"))
     total_ht = Column(Numeric(14, 2), nullable=False, default=0, server_default=text("0"))
     total_ttc = Column(Numeric(14, 2), nullable=False, default=0, server_default=text("0"))
+    total_taxes = Column(Numeric(14, 2), nullable=False, default=0, server_default=text("0"))
     modalite_paiement = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
     statut = Column(String(30), nullable=False, default="brouillon", server_default=text("'brouillon'"))
@@ -1224,6 +1252,7 @@ class Facture(Base):
             name="ck_facture_statut",
         ),
         CheckConstraint("montant_facture >= 0", name="ck_facture_montant_non_negatif"),
+        CheckConstraint("frais_agence IS NULL OR frais_agence >= 0", name="ck_facture_frais_agence_non_negatif"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -1253,6 +1282,9 @@ class Facture(Base):
     objet = Column(String(255), nullable=True)
     date_facture = Column(Date, nullable=False, server_default=func.current_date())
     montant_facture = Column(Numeric(14, 2), nullable=False, default=0, server_default=text("0"))
+    # Snapshot at invoicing time. NULL means historical fees still need input.
+    frais_agence = Column(Numeric(14, 2), nullable=True)
+    proforma_snapshot = Column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
     statut = Column(String(30), nullable=False, default="non_payee", server_default=text("'non_payee'"))
     created_by_id = Column(
         Integer,
