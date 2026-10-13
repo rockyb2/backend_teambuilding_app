@@ -172,6 +172,12 @@ def cancel_budget(budget_id: int, db: Session = Depends(get_db)):
 def download_budget_pdf(budget_id: int, db: Session = Depends(get_db)):
     db_budget = _get_budget_or_404(db, budget_id)
     pdf_path = crud_budget.get_budget_pdf_path(db_budget)
+    if pdf_path and pdf_path.is_file() and db_budget.statut != "annule" and not crud_budget.is_budget_pdf_current(pdf_path):
+        try:
+            crud_budget.generate_documents_for_budget(db, db_budget)
+            pdf_path = crud_budget.get_budget_pdf_path(db_budget)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
     if not pdf_path or not pdf_path.exists() or not pdf_path.is_file():
         raise HTTPException(status_code=404, detail="PDF non généré")
     return FileResponse(

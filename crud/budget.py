@@ -12,7 +12,7 @@ from database.models import Budget, Offre
 from database.schemas import BudgetCreate, BudgetUpdate
 from services.budget_documents import (
     BASE_DIR, calculate_budget_totals, generate_budget_excel, generate_budget_pdf,
-    generate_multi_site_budget_excel,
+    generate_multi_site_budget_excel, is_budget_pdf_current,
 )
 from services.taxes import calculate_taxes
 

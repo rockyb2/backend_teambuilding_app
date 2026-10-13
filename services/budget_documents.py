@@ -12,11 +12,11 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils.cell import quote_sheetname
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
-from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
-from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image, KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from services.agency_fees import resolve_agency_fee_rate
 from services.taxes import add_persisted_taxes
 
@@ -337,511 +337,489 @@ def calculate_budget_totals(
     }
 
 
+# Shared palette and wording from the supplied FPC Consulting workbook.
+BUDGET_TITLE = "FFDE66"
+BUDGET_SECTION = "FFC000"
+BUDGET_HEADER = "E7E6E6"
+BUDGET_SUBTOTAL = "AEAAAA"
+BUDGET_IMPLEMENTATION = "C6E0B4"
+BUDGET_TOTAL = "FFFF00"
+BUDGET_NOTES = "ED7D31"
+BUDGET_NOTICE = "A9D18E"
+BUDGET_DISCLAIMER = (
+    "Ce document est un estimatif budgétaire et non un devis. Il est par conséquent "
+    "amené à être revu à la hausse ou à la baisse, en fonction des options et "
+    "caractéristiques définitivement retenues."
+)
+AGENCY_DETAILS = (
+    "Honoraires de conception, d'organisation, de mise en œuvre opérationnelle "
+    "et d'animations d'activités\n"
+    "- Matériels et port\n"
+    "- Ressources humaines\n"
+    "- Transport de l'équipe\n"
+    "- Restauration de l'équipe\n"
+    "- Hébergement de l'équipe"
+)
+
+
+def _document_totals(data: dict[str, Any]) -> dict[str, Any]:
+    required = ("reference", "client", "nombre_personnes", "date_budget", "titre")
+    missing = [field for field in required if not data.get(field)]
+    if missing:
+        raise ValueError(f"Champs obligatoires manquants: {', '.join(missing)}")
+    if int(data["nombre_personnes"]) <= 0:
+        raise ValueError("nombre_personnes doit être supérieur à zéro.")
+    totals = calculate_budget_totals(
+        data.get("sections") or [], data.get("frais_agence") or 0,
+        data.get("taux_tva_frais_agence") or 0, data.get("mode_frais_agence") or "montant",
+    )
+    if not totals["sections"]:
+        raise ValueError("Le budget doit contenir au moins une ligne.")
+    return add_persisted_taxes(totals, data)
+
+
+def _display_sections(totals: dict[str, Any]) -> list[dict[str, Any]]:
+    """Show persisted taxes before fees without including them in the agency fee base."""
+    sections = list(totals["sections"])
+    if totals["taxes_selectionnees"]:
+        lines = []
+        for tax in totals["taxes_selectionnees"]:
+            amount = tax["montant"]
+            per_night = tax.get("tarif") is not None
+            label = str(tax.get("nom") or tax.get("code") or "Taxe")
+            if tax.get("taux") is not None:
+                label += f" ({_format_quantity(tax['taux'])} %)"
+            lines.append({
+                "designation": label,
+                "quantite": tax.get("nombre_chambres", 1) if per_night else 1,
+                "prix_unitaire": tax["tarif"] if per_night else amount,
+                "nombre_jours": tax.get("nombre_nuitees", 1) if per_night else 1,
+                "montant_ht": amount,
+                # Fiscal amounts are snapshots, not editable recalculations of current rates.
+                "persisted_tax": True,
+            })
+        sections.append({
+            "nom": "Taxes et contributions",
+            "prestations": lines, "sous_total": totals["total_taxes"], "persisted_tax": True,
+        })
+    return sections
+
+
+def _document_money(value: Any) -> str:
+    amount = Decimal(str(value or 0))
+    decimals = 0 if amount == amount.to_integral_value() else 2
+    return f"{amount:,.{decimals}f}".replace(",", " ").replace(".", ",") + " CFA"
+
+
+def is_budget_pdf_current(path: Path) -> bool:
+    if not path.is_file():
+        return False
+    dependencies = (Path(__file__), ASSETS_DIR / "logo.png")
+    return path.stat().st_mtime >= max(item.stat().st_mtime for item in dependencies if item.is_file())
+
+
 def _draw_page(canvas: Any, document: Any) -> None:
     canvas.saveState()
-    width, height = landscape(A4)
-    logo_path = _first_existing_asset("logo.png")
-    if logo_path:
-        canvas.drawImage(
-            str(logo_path),
-            18 * mm,
-            height - 25 * mm,
-            width=42 * mm,
-            height=16 * mm,
-            preserveAspectRatio=True,
-            mask="auto",
-        )
-    canvas.setFont("Helvetica", 7)
-    canvas.setFillColor(colors.HexColor("#64748B"))
-    canvas.drawCentredString(width / 2, 10 * mm, "Ivoir Trips International - Budget estimatif")
+    width, _ = A4
+    canvas.setFont("Helvetica", 6)
+    canvas.setFillColor(colors.HexColor("#666666"))
+    canvas.drawString(10 * mm, 7 * mm, "Ivoir Trips International — Budget estimatif")
+    canvas.drawRightString(width - 10 * mm, 7 * mm, f"Page {document.page}")
     canvas.restoreState()
 
 
 def generate_budget_pdf(data: dict[str, Any], output_dir: str | Path | None = None) -> str:
-    required_fields = ("reference", "client", "nombre_personnes", "date_budget", "titre")
-    missing = [field for field in required_fields if not data.get(field)]
-    if missing:
-        raise ValueError(f"Champs obligatoires manquants: {', '.join(missing)}")
-    if int(data.get("nombre_personnes") or 0) <= 0:
-        raise ValueError("nombre_personnes doit être supérieur à zéro.")
-
-    totals = calculate_budget_totals(
-        data.get("sections") or [],
-        data.get("frais_agence") or 0,
-        data.get("taux_tva_frais_agence") or 0,
-        data.get("mode_frais_agence") or "montant",
-    )
-    totals = add_persisted_taxes(totals, data)
-    sections = totals["sections"]
-    if not sections:
-        raise ValueError("Le budget doit contenir au moins une ligne.")
-
-    reference = str(data["reference"]).strip()
-    output_path = _safe_document_path(reference, "pdf", output_dir)
+    totals = _document_totals(data)
+    output_path = _safe_document_path(data["reference"], "pdf", output_dir)
+    width = 190 * mm
+    columns = [width * ratio for ratio in (.39, .12, .195, .12, .175)]
     styles = _styles()
-
+    styles["section"].alignment = TA_CENTER
+    for key in ("normal", "center", "right", "right_bold", "section"):
+        styles[key].fontSize = 7
+        styles[key].leading = 8.7
+    styles["title"].fontSize = 10
+    styles["title"].leading = 13
+    notice_style = ParagraphStyle(
+        "BudgetNotice", parent=styles["center"], fontName="Helvetica-Bold",
+        fontSize=9, leading=12,
+    )
+    vat_style = ParagraphStyle(
+        "BudgetVat", parent=styles["right_bold"], textColor=colors.red,
+    )
     document = SimpleDocTemplate(
-        str(output_path),
-        pagesize=landscape(A4),
-        leftMargin=14 * mm,
-        rightMargin=14 * mm,
-        topMargin=31 * mm,
-        bottomMargin=16 * mm,
-        title=f"Budget estimatif {reference}",
-        author="Ivoir Trips International",
+        str(output_path), pagesize=A4,
+        leftMargin=10 * mm, rightMargin=10 * mm,
+        topMargin=9 * mm, bottomMargin=13 * mm,
+        title=f"Budget estimatif {data['reference']}", author="Ivoir Trips International",
     )
     story: list[Any] = []
-    story.append(_paragraph("BUDGET ESTIMATIF", styles["title"]))
-    story.append(Spacer(1, 4 * mm))
-
-    header_rows = [
-        [
-            _paragraph(f"Référence: {reference}", styles["normal"]),
-            _paragraph(f"Client: {data['client']}", styles["right_bold"]),
-        ],
-        [
-            _paragraph(f"Objet: {data['titre']}", styles["normal"]),
-            _paragraph(f"Date: {_display_date(data['date_budget'])}", styles["right"]),
-        ],
-        [
-            _paragraph(f"Participants: {data['nombre_personnes']}", styles["normal"]),
-            _paragraph(f"Événement: {_display_date(data.get('date_evenement')) or '-'}", styles["right"]),
-        ],
-    ]
-    header_table = Table(header_rows, colWidths=[128 * mm, 128 * mm])
-    header_table.setStyle(
-        TableStyle(
-            [
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-            ]
-        )
-    )
-    story.append(header_table)
-    story.append(Spacer(1, 4 * mm))
-
-    rows: list[list[Any]] = [
-        [
-            _paragraph("Désignation", styles["center"]),
-            _paragraph("Jours", styles["center"]),
-            _paragraph("Qté", styles["center"]),
-            _paragraph("Prix unitaire", styles["center"]),
-            _paragraph("Montant HT", styles["center"]),
-        ]
-    ]
-    table_commands: list[tuple[Any, ...]] = [
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#FFF1E6")),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+    logo_path = _first_existing_asset("logo.png")
+    if logo_path:
+        logo_width, logo_height = _image_dimensions(logo_path, 76 * mm, 24 * mm)
+        logo = Image(str(logo_path), width=logo_width, height=logo_height, hAlign="CENTER")
+        story.extend([logo, Spacer(1, 2 * mm)])
+    title = Table([
+        [_paragraph("BUDGET ESTIMATIF", styles["title"])],
+        [_paragraph(str(data["titre"]).upper(), styles["section"])],
+    ], colWidths=[width])
+    title.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#" + BUDGET_TITLE)),
+        ("BOX", (0, 0), (-1, -1), .7, colors.black),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(title)
+    header = Table([
+        ["DATE :", _display_date(data["date_budget"]), "", "LIEU :", _budget_location(data)],
+        ["CLIENT :", str(data["client"]).upper(), "DURÉE", "JOUR(S) :", data.get("duree_jours") or 1],
+        ["NOMBRE DE PARTICIPANTS :", data["nombre_personnes"], "", "NUIT(S) :", _budget_nights(data)],
+    ], colWidths=columns)
+    for row in header._cellvalues:
+        for i, value in enumerate(row):
+            row[i] = _paragraph(value, styles["normal"] if i in (0, 3) else styles["center"])
+    header.setStyle(TableStyle([
+        ("GRID", (0, 0), (1, -1), .6, colors.black),
+        ("GRID", (3, 0), (-1, -1), .6, colors.black),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#CBD5E1")),
-        ("LEFTPADDING", (0, 0), (-1, -1), 4),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
         ("TOPPADDING", (0, 0), (-1, -1), 3),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+    ]))
+    story.extend([header, Spacer(1, 6 * mm)])
+    rows = [[_paragraph(label, styles["section"]) for label in (
+        "Désignation", "Quantité", "Coût unitaire", "Nombre de jours", "Coût total",
+    )]]
+    commands = [
+        ("GRID", (0, 0), (-1, -1), .6, colors.black),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#" + BUDGET_HEADER)),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ]
-
-    for section in sections:
-        section_row = len(rows)
+    for section in _display_sections(totals):
+        first = len(rows)
         rows.append([_paragraph(section["nom"].upper(), styles["section"]), "", "", "", ""])
-        table_commands.append(("SPAN", (0, section_row), (-1, section_row)))
-        table_commands.append(("BACKGROUND", (0, section_row), (-1, section_row), colors.HexColor("#ECFDF5")))
-
+        commands.extend([
+            ("SPAN", (0, first), (-1, first)),
+            ("BACKGROUND", (0, first), (-1, first), colors.HexColor("#" + BUDGET_SECTION)),
+            ("NOSPLIT", (0, first), (-1, first + 1)),
+        ])
         for item in section["prestations"]:
-            rows.append(
-                [
-                    _paragraph(item["designation"], styles["normal"]),
-                    _paragraph(_format_quantity(item.get("nombre_jours")), styles["right"]),
-                    _paragraph(_format_quantity(item.get("quantite")), styles["right"]),
-                    _paragraph(_format_fcfa(item.get("prix_unitaire")), styles["right"]),
-                    _paragraph(_format_fcfa(item.get("montant_ht")), styles["right"]),
-                ]
-            )
+            rows.append([
+                _paragraph(item["designation"], styles["normal"]),
+                _paragraph(_format_quantity(item["quantite"]), styles["center"]),
+                _paragraph(_document_money(item["prix_unitaire"]), styles["right"]),
+                _paragraph(_format_quantity(item["nombre_jours"]), styles["center"]),
+                _paragraph(_document_money(item["montant_ht"]), styles["right"]),
+            ])
+        subtotal = len(rows)
+        rows.append([
+            _paragraph(f"SOUS-TOTAL {section['nom'].upper()}", styles["section"]), "", "", "",
+            _paragraph(_document_money(section["sous_total"]), styles["right_bold"]),
+        ])
+        commands.extend([
+            ("SPAN", (0, subtotal), (3, subtotal)),
+            ("BACKGROUND", (0, subtotal), (-1, subtotal), colors.HexColor("#" + BUDGET_SUBTOTAL)),
+            ("NOSPLIT", (0, subtotal - 1), (-1, subtotal)),
+        ])
+        # Small rubrics should not be cut between pages (notably the two hotel taxes).
+        if len(section["prestations"]) <= 3:
+            commands.append(("NOSPLIT", (0, first), (-1, subtotal)))
+        spacer = len(rows)
+        rows.append([""] * 5)
+        commands.extend([
+            ("SPAN", (0, spacer), (-1, spacer)),
+            ("TOPPADDING", (0, spacer), (-1, spacer), 1),
+            ("BOTTOMPADDING", (0, spacer), (-1, spacer), 1),
+        ])
+    row = len(rows)
+    rows.append([
+        _paragraph("SOUS-TOTAL MISE EN ŒUVRE", styles["section"]), "", "", "",
+        _paragraph(_document_money(totals["sous_total_ht"] + totals["total_taxes"]), styles["right_bold"]),
+    ])
+    commands.extend([
+        ("SPAN", (0, row), (3, row)),
+        ("BACKGROUND", (0, row), (-1, row), colors.HexColor("#" + BUDGET_IMPLEMENTATION)),
+        ("NOSPLIT", (0, row - 2), (-1, row)),
+    ])
+    table = Table(rows, colWidths=columns, repeatRows=1, hAlign="CENTER")
+    table.setStyle(TableStyle(commands))
+    story.extend([table, Spacer(1, 4 * mm)])
 
-        subtotal_row = len(rows)
-        rows.append(
-            [
-                _paragraph(f"Sous-total {section['nom']}", styles["section"]),
-                "",
-                "",
-                "",
-                _paragraph(_format_fcfa(section["sous_total"]), styles["right_bold"]),
-            ]
-        )
-        table_commands.extend(
-            [
-                ("BACKGROUND", (0, subtotal_row), (-1, subtotal_row), colors.HexColor("#F8FAFC")),
-                ("SPAN", (0, subtotal_row), (3, subtotal_row)),
-            ]
-        )
-
-    summary_rows = [
-        ("Sous-total prestations", totals["sous_total_ht"]),
-        ("Frais d'agence (17,5 %)" if totals["mode_frais_agence"] == "pourcentage" else "Frais d'agence", totals["frais_agence"]),
-        (f"TVA frais d'agence {format(totals['taux_tva_frais_agence'].normalize(), 'f')}%", totals["tva_frais_agence"]),
+    fee_title = "HONORAIRES D'AGENCE"
+    if totals["mode_frais_agence"] == "pourcentage":
+        fee_title += " — 17,5 % des prestations HT"
+    vat_rate = _format_quantity(totals["taux_tva_frais_agence"])
+    footer_rows = [
+        [_paragraph(fee_title, styles["section"]), "", "", "", ""],
+        [Paragraph(escape(AGENCY_DETAILS).replace("\n", "<br/>"), styles["normal"]), "", "", "",
+         _paragraph(_document_money(totals["frais_agence"]), styles["right_bold"])],
+        [_paragraph("TOTAL AVANT TVA SUR HONORAIRES", styles["section"]), "", "", "",
+         _paragraph(_document_money(totals["total_ht"] + totals["total_taxes"]), styles["right_bold"])],
+        ["", "", _paragraph(f"TVA {vat_rate} %", vat_style), "",
+         _paragraph(_document_money(totals["tva_frais_agence"]), vat_style)],
+        ["", "", _paragraph("TOTAL TTC", styles["section"]), "",
+         _paragraph(_document_money(totals["total_ttc"]), styles["right_bold"])],
+        ["", "", _paragraph("TOTAL TTC / PERSONNE", styles["section"]), "",
+         _paragraph(_document_money((totals["total_ttc"] / Decimal(str(data["nombre_personnes"]))).quantize(Decimal("1"), rounding=ROUND_HALF_UP)), styles["right_bold"])],
     ]
-    summary_rows.extend((str(taxe.get("nom") or taxe.get("code") or "Taxe"), taxe["montant"]) for taxe in totals["taxes_selectionnees"])
-    summary_rows.append(("Total estimatif", totals["total_ttc"]))
-    for label, value in summary_rows:
-        row_index = len(rows)
-        rows.append(["", "", "", _paragraph(label, styles["section"]), _paragraph(_format_fcfa(value), styles["right_bold"])])
-        table_commands.append(("SPAN", (0, row_index), (2, row_index)))
-        if label == "Total estimatif":
-            table_commands.append(("BACKGROUND", (3, row_index), (4, row_index), colors.HexColor("#FFEDD5")))
-
-    budget_table = Table(
-        rows,
-        colWidths=[153 * mm, 20 * mm, 20 * mm, 33 * mm, 36 * mm],
-        repeatRows=1,
-        hAlign="CENTER",
-    )
-    budget_table.setStyle(TableStyle(table_commands))
-    story.append(budget_table)
-
-    notes = str(data.get("notes") or "").strip()
-    if notes:
-        story.append(Spacer(1, 4 * mm))
-        story.append(_paragraph(f"Notes: {notes}", styles["small"]))
-
+    notes = _budget_notes(data)
+    note_style = ParagraphStyle("BudgetNotes", parent=styles["normal"], fontName="Helvetica-Bold")
+    for index, note in enumerate(notes):
+        row = 4 + index
+        while len(footer_rows) <= row:
+            footer_rows.append([""] * 5)
+        footer_rows[row][0] = _paragraph(note, note_style)
+    footer = Table(footer_rows, colWidths=columns)
+    footer_commands = [
+        ("SPAN", (0, 0), (-1, 0)),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#" + BUDGET_SECTION)),
+        ("SPAN", (0, 1), (2, 1)), ("SPAN", (0, 2), (3, 2)),
+        ("GRID", (0, 0), (-1, 2), .6, colors.black),
+        ("BACKGROUND", (0, 2), (-1, 2), colors.HexColor("#" + BUDGET_SUBTOTAL)),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("VALIGN", (4, 1), (4, 1), "BOTTOM"),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]
+    for row in (3, 4, 5):
+        footer_commands.extend([
+            ("SPAN", (2, row), (3, row)),
+            ("GRID", (2, row), (-1, row), .6, colors.black),
+            ("BACKGROUND", (2, row), (3 if row == 3 else 4, row),
+             colors.HexColor("#" + (BUDGET_SUBTOTAL if row == 3 else BUDGET_TOTAL))),
+        ])
+    for row in range(4, 4 + len(notes)):
+        footer_commands.extend([
+            ("SPAN", (0, row), (1, row)),
+            ("BACKGROUND", (0, row), (1, row), colors.HexColor("#" + BUDGET_NOTES)),
+        ])
+    footer.setStyle(TableStyle(footer_commands))
+    notice = Table([[_paragraph(BUDGET_DISCLAIMER, notice_style)]], colWidths=[width - 8 * mm])
+    notice.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#" + BUDGET_NOTICE)),
+        ("BOX", (0, 0), (-1, -1), .5, colors.HexColor("#4472C4")),
+        ("TOPPADDING", (0, 0), (-1, -1), 12),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+    ]))
+    story.extend([KeepTogether(footer), Spacer(1, 4 * mm), notice])
     document.build(story, onFirstPage=_draw_page, onLaterPages=_draw_page)
     return str(output_path)
 
 
 def _append_budget_sheet(workbook: Workbook, data: dict[str, Any]) -> dict[str, Any]:
-    required_fields = ("reference", "client", "nombre_personnes", "date_budget", "titre")
-    missing = [field for field in required_fields if not data.get(field)]
-    if missing:
-        raise ValueError(f"Champs obligatoires manquants: {', '.join(missing)}")
-
-    totals = calculate_budget_totals(
-        data.get("sections") or [],
-        data.get("frais_agence") or 0,
-        data.get("taux_tva_frais_agence") or 0,
-        data.get("mode_frais_agence") or "montant",
-    )
-    totals = add_persisted_taxes(totals, data)
-    sections = totals["sections"]
-    if not sections:
-        raise ValueError("Le budget doit contenir au moins une ligne.")
-
+    totals = _document_totals(data)
     base_title = _safe_sheet_title(data.get("site_nom") or data.get("titre") or "Budget")
-    title = base_title
-    suffix = 2
+    title, suffix = base_title, 2
     while title.casefold() in {name.casefold() for name in workbook.sheetnames}:
         marker = f" ({suffix})"
         title = base_title[:31 - len(marker)] + marker
         suffix += 1
     sheet = workbook.create_sheet(title)
     sheet.sheet_view.showGridLines = False
+    sheet.sheet_view.zoomScale = 60
+    workbook.calculation.fullCalcOnLoad = True
+    workbook.calculation.forceFullCalc = True
 
-    try:
-        workbook.calculation.fullCalcOnLoad = True
-        workbook.calculation.forceFullCalc = True
-    except AttributeError:
-        pass
+    # Same column proportions, typeface and worksheet scale as the reference.
+    for column, size in {"A": 1.285, "B": 118.71, "C": 36.57, "D": 59.285, "E": 36.285, "F": 53.71}.items():
+        sheet.column_dimensions[column].width = size
+    edge = Side(style="thin", color="000000")
+    border = Border(left=edge, right=edge, top=edge, bottom=edge)
+    money_format = '#,##0 "CFA"'
+    decimal_money_format = '#,##0.00 "CFA"'
 
-    font_name = "Agency FB"
-    orange_fill = PatternFill("solid", fgColor="FFF1E6")
-    green_fill = PatternFill("solid", fgColor="EAF7F0")
-    total_fill = PatternFill("solid", fgColor="FFFF00")
-    dark_fill = PatternFill("solid", fgColor="0F172A")
-    thin_side = Side(style="thin", color="CBD5E1")
-    medium_side = Side(style="medium", color="0F172A")
-    regular_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
-    strong_top_border = Border(top=medium_side, bottom=thin_side, left=thin_side, right=thin_side)
-    title_font = Font(name=font_name, bold=True, size=18, color="0F172A")
-    subtitle_font = Font(name=font_name, bold=True, size=16, color="0F172A")
-    header_font = Font(name=font_name, bold=True, size=13, color="0F172A")
-    body_font = Font(name=font_name, size=12, color="0F172A")
-    body_bold = Font(name=font_name, bold=True, size=12, color="0F172A")
-    white_bold = Font(name=font_name, bold=True, size=12, color="FFFFFF")
-    money_format = '#,##0 "FCFA"'
+    def style_row(row, first=2, last=6, fill=None, bold=False, height=35):
+        sheet.row_dimensions[row].height = height
+        for col in range(first, last + 1):
+            cell = sheet.cell(row, col)
+            cell.font = Font(name="Agency FB", size=18, bold=bold, color="000000")
+            cell.border = border
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            if fill:
+                cell.fill = PatternFill("solid", fgColor=fill)
 
-    sheet.column_dimensions["A"].width = 3
-    sheet.column_dimensions["B"].width = 58
-    sheet.column_dimensions["C"].width = 14
-    sheet.column_dimensions["D"].width = 17
-    sheet.column_dimensions["E"].width = 17
-    sheet.column_dimensions["F"].width = 20
-    sheet.column_dimensions["G"].width = 3
-    for row_index in range(1, 6):
-        sheet.row_dimensions[row_index].height = 12
-    sheet.row_dimensions[6].height = 42
+    def merge(row, first, last, value, *, align="center"):
+        sheet.merge_cells(start_row=row, start_column=first, end_row=row, end_column=last)
+        cell = sheet.cell(row, first, value)
+        cell.alignment = Alignment(horizontal=align, vertical="center", wrap_text=True)
+        return cell
 
+    def money(row, value):
+        cell = sheet.cell(row, 6, value)
+        cell.number_format = money_format
+        cell.alignment = Alignment(horizontal="right", vertical="center")
+        if isinstance(value, (int, float, Decimal)) and Decimal(str(value)) % 1:
+            cell.number_format = decimal_money_format
+        return cell
+
+    sheet.row_dimensions[1].height = 6.4
+    for row in range(2, 6):
+        sheet.row_dimensions[row].height = 14.65
+    sheet.row_dimensions[6].height = 105
+    # Center the image using its actual aspect ratio within the full B:F width.
     logo_path = _first_existing_asset("logo.png")
     if logo_path:
-        try:
-            logo = ExcelImage(str(logo_path))
-            logo.width = 185
-            logo.height = 65
-            sheet.add_image(logo, "B2")
-        except Exception:
-            pass
-
-    sheet["D7"] = "BUDGET ESTIMATIF"
-    sheet["D8"] = "SÉMINAIRE TEAM BUILDING"
-    for cell_ref, font in (("D7", title_font), ("D8", subtitle_font)):
-        cell = sheet[cell_ref]
-        cell.font = font
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-    sheet.row_dimensions[7].height = 30
-    sheet.row_dimensions[8].height = 26
-
-    days = int(_excel_number(data.get("duree_jours"), 1) or 1)
-    participants = int(_excel_number(data.get("nombre_personnes"), 1) or 1)
-    header_values = {
-        "B9": "DATE :",
-        "C9": _display_date(data["date_budget"]),
-        "E9": "LIEU :",
-        "F9": _budget_location(data),
-        "B10": "CLIENT :",
-        "C10": str(data["client"]).upper(),
-        "D10": "DURÉE",
-        "E10": "JOUR(S) :",
-        "F10": days,
-        "B11": "NOMBRE DE PARTICIPANTS :",
-        "C11": participants,
-        "E11": "NUIT(S) :",
-        "F11": _budget_nights(data),
-    }
-    for cell_ref, value in header_values.items():
-        cell = sheet[cell_ref]
-        cell.value = value
-        cell.font = body_bold
-        cell.alignment = Alignment(
-            horizontal="center" if cell_ref[0] in {"C", "F"} else "left",
-            vertical="center",
-            wrap_text=True,
+        from openpyxl.drawing.spreadsheet_drawing import AnchorMarker, OneCellAnchor
+        from openpyxl.drawing.xdr import XDRPositiveSize2D
+        from openpyxl.utils.units import pixels_to_EMU
+        logo = ExcelImage(str(logo_path))
+        logo.width, logo.height = _image_dimensions(logo_path, 610, 175)
+        table_pixels = sum(int(sheet.column_dimensions[c].width * 7 + 5) for c in "BCDEF")
+        logo.anchor = OneCellAnchor(
+            _from=AnchorMarker(col=1, row=1, colOff=pixels_to_EMU((table_pixels - logo.width) / 2), rowOff=pixels_to_EMU(12)),
+            ext=XDRPositiveSize2D(pixels_to_EMU(logo.width), pixels_to_EMU(logo.height)),
         )
-    sheet["D10"].alignment = Alignment(horizontal="right", vertical="center", wrap_text=True)
-    for row_index in (9, 10, 11):
-        sheet.row_dimensions[row_index].height = 22
-    for row_index in (12, 13, 14):
-        sheet.row_dimensions[row_index].height = 8
+        sheet.add_image(logo)
 
-    header_row = 15
-    headers = {
-        "B": "Désignation",
-        "C": "Quantité",
-        "D": "Coût unitaire",
-        "E": "Nombre de jours",
-        "F": "Coût total",
+    for row, value, height in ((7, "BUDGET ESTIMATIF", 63), (8, str(data["titre"]).upper(), 42.6)):
+        style_row(row, fill=BUDGET_TITLE, bold=True, height=height)
+        merge(row, 2, 6, value)
+    participants = int(data["nombre_personnes"])
+    header = {
+        "B9": "DATE :", "C9": _display_date(data["date_budget"]),
+        "E9": "LIEU :", "F9": _budget_location(data),
+        "B10": "CLIENT :", "C10": str(data["client"]).upper(),
+        "D10": "DURÉE", "E10": "JOUR(S) :", "F10": int(data.get("duree_jours") or 1),
+        "B11": "NOMBRE DE PARTICIPANTS :", "C11": participants,
+        "E11": "NUIT(S) :", "F11": _budget_nights(data),
     }
-    for column, label in headers.items():
-        cell = sheet[f"{column}{header_row}"]
-        cell.value = label
-        cell.font = header_font
-        cell.fill = orange_fill
-        cell.border = regular_border
-        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    sheet.row_dimensions[header_row].height = 25
+    for row in (9, 10, 11):
+        style_row(row, bold=True, height=33)
+        sheet.cell(row, 4).border = Border()
+    for coordinate, value in header.items():
+        cell = sheet[coordinate]
+        cell.value = value
+        cell.alignment = Alignment(
+            horizontal="left" if coordinate[0] in "BE" else "center",
+            vertical="center", wrap_text=True,
+        )
+    sheet["D10"].alignment = Alignment(horizontal="right", vertical="center")
+    for row in (12, 13, 14):
+        sheet.row_dimensions[row].height = 22
 
-    current_row = header_row + 1
-    subtotal_rows: list[int] = []
-    for section in sections:
-        section_name = str(section["nom"]).upper()
-        sheet.cell(row=current_row, column=2, value=section_name)
-        for column_index in range(2, 7):
-            cell = sheet.cell(row=current_row, column=column_index)
-            cell.font = white_bold
-            cell.fill = dark_fill
-            cell.border = regular_border
-            cell.alignment = Alignment(
-                horizontal="centerContinuous" if column_index == 2 else "center",
-                vertical="center",
-                wrap_text=True,
-            )
-        sheet.row_dimensions[current_row].height = 23
+    style_row(15, fill=BUDGET_HEADER, bold=True, height=27)
+    for col, label in enumerate(("Désignation", "Quantité", "Coût unitaire", "Nombre de jours", "Coût total"), 2):
+        sheet.cell(15, col, label)
+    current_row = 16
+    subtotal_rows, service_subtotal_rows = [], []
+    for section in _display_sections(totals):
+        name = str(section["nom"]).upper()
+        style_row(current_row, fill=BUDGET_SECTION, bold=True)
+        merge(current_row, 2, 6, name)
         current_row += 1
-
         first_line_row = current_row
         for item in section["prestations"]:
+            # Wrap long descriptions without clipping custom prestations.
+            text_lines = sum(max(1, (len(line) + 84) // 85) for line in item["designation"].splitlines())
+            style_row(current_row, height=max(35, text_lines * 24 + 10))
+            sheet.cell(current_row, 2, item["designation"]).alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
             quantity = _excel_number(item.get("quantite"), 1)
-            unit_price = _excel_number(item.get("prix_unitaire"), 0)
-            item_days = _excel_number(item.get("nombre_jours"), 1)
-            line_amount = int(_excel_number(item.get("montant_ht"), 0))
-
-            sheet.cell(row=current_row, column=2, value=item["designation"])
-            sheet.cell(row=current_row, column=3, value=quantity)
-            sheet.cell(row=current_row, column=4, value=unit_price)
-            sheet.cell(row=current_row, column=5, value=item_days)
-            calculated_amount = (Decimal(str(quantity)) * Decimal(str(unit_price)) * Decimal(str(item_days))).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-            if unit_price > 0 and calculated_amount == line_amount:
-                sheet.cell(row=current_row, column=6, value=f"=ROUND(C{current_row}*D{current_row}*E{current_row},0)")
-            else:
-                sheet.cell(row=current_row, column=6, value=line_amount)
-
-            for column_index in range(2, 7):
-                cell = sheet.cell(row=current_row, column=column_index)
-                cell.font = body_font
-                cell.border = regular_border
-                cell.alignment = Alignment(
-                    horizontal="left" if column_index == 2 else "center",
-                    vertical="center",
-                    wrap_text=True,
-                )
-                if column_index in (4, 6):
-                    cell.number_format = money_format
-            sheet.row_dimensions[current_row].height = 28
+            price = _excel_number(item.get("prix_unitaire"))
+            days = _excel_number(item.get("nombre_jours"), 1)
+            amount = Decimal(str(item["montant_ht"]))
+            sheet.cell(current_row, 3, quantity)
+            sheet.cell(current_row, 4, price).number_format = decimal_money_format if Decimal(str(price)) % 1 else money_format
+            sheet.cell(current_row, 4).alignment = Alignment(horizontal="right", vertical="center")
+            sheet.cell(current_row, 5, days)
+            calculated = (Decimal(str(quantity)) * Decimal(str(price)) * Decimal(str(days))).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+            value = (
+                f"=ROUND(C{current_row}*D{current_row}*E{current_row},0)"
+                if not item.get("persisted_tax") and calculated == amount else _excel_number(amount)
+            )
+            money(current_row, value)
             current_row += 1
-
-        last_line_row = current_row - 1
+        style_row(current_row, fill=BUDGET_SUBTOTAL, bold=True)
+        merge(current_row, 2, 5, f"SOUS-TOTAL {name}")
+        money(current_row, f"=SUM(F{first_line_row}:F{current_row - 1})")
         subtotal_rows.append(current_row)
-        sheet.cell(row=current_row, column=3, value=f"SOUS-TOTAL {section_name}")
-        sheet.cell(row=current_row, column=6, value=f"=SUM(F{first_line_row}:F{last_line_row})")
-        for column_index in range(2, 7):
-            cell = sheet.cell(row=current_row, column=column_index)
-            cell.font = body_bold
-            cell.fill = green_fill
-            cell.border = strong_top_border
-            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-            if column_index == 6:
-                cell.number_format = money_format
-        sheet.row_dimensions[current_row].height = 24
-        sheet.row_dimensions[current_row + 1].height = 8
+        if not section.get("persisted_tax"):
+            service_subtotal_rows.append(current_row)
+        sheet.row_dimensions[current_row + 1].height = 25
         current_row += 2
 
     implementation_row = current_row
-    sheet.cell(row=implementation_row, column=3, value="SOUS-TOTAL MISE EN ŒUVRE")
-    sheet.cell(
-        row=implementation_row,
-        column=6,
-        value="=" + "+".join(f"F{row_index}" for row_index in subtotal_rows),
-    )
-    for column_index in range(2, 7):
-        cell = sheet.cell(row=implementation_row, column=column_index)
-        cell.font = body_bold
-        cell.fill = orange_fill
-        cell.border = strong_top_border
-        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        if column_index == 6:
-            cell.number_format = money_format
-    sheet.row_dimensions[implementation_row].height = 25
-    sheet.row_dimensions[current_row + 1].height = 8
+    style_row(current_row, fill=BUDGET_IMPLEMENTATION, bold=True)
+    merge(current_row, 2, 5, "SOUS-TOTAL MISE EN ŒUVRE")
+    money(current_row, "=" + "+".join(f"F{row}" for row in subtotal_rows))
+    sheet.row_dimensions[current_row + 1].height = 25
     current_row += 2
 
     agency_title_row = current_row
-    sheet.cell(row=agency_title_row, column=2, value="HONORAIRES D'AGENCE")
-    for column_index in range(2, 7):
-        cell = sheet.cell(row=agency_title_row, column=column_index)
-        cell.font = white_bold
-        cell.fill = dark_fill
-        cell.border = regular_border
-        cell.alignment = Alignment(
-            horizontal="centerContinuous" if column_index == 2 else "center",
-            vertical="center",
-            wrap_text=True,
-        )
-    sheet.row_dimensions[agency_title_row].height = 23
-    current_row += 1
-
-    agency_details = (
-        "Honoraires de conception, d'organisation, de mise en œuvre opérationnelle et "
-        "d'animations d'activités\n"
-        "-Matériels et port\n"
-        "-Ressources humaines\n"
-        "-Transport de l'équipe\n"
-        "-Restauration de l'équipe\n"
-        "-Hébergement de l'équipe"
-    )
-    agency_amount_row = current_row
-    sheet.cell(row=agency_amount_row, column=2, value=agency_details)
-    sheet.cell(row=agency_amount_row, column=6, value=(
-        f"=ROUND(F{implementation_row}*17.5%,0)"
-        if totals["mode_frais_agence"] == "pourcentage" else int(totals["frais_agence"])
-    ))
+    style_row(current_row, fill=BUDGET_SECTION, bold=True, height=45)
+    title = "HONORAIRES D'AGENCE"
     if totals["mode_frais_agence"] == "pourcentage":
-        sheet.cell(row=agency_title_row, column=2, value="HONORAIRES D'AGENCE - 17,5 %")
-    for column_index in range(2, 7):
-        cell = sheet.cell(row=agency_amount_row, column=column_index)
-        cell.font = body_font
-        cell.border = regular_border
-        cell.alignment = Alignment(
-            horizontal="left" if column_index == 2 else "center",
-            vertical="center",
-            wrap_text=True,
-        )
-        if column_index == 6:
-            cell.number_format = money_format
-            cell.font = body_bold
-    sheet.row_dimensions[agency_amount_row].height = 92
+        title += " — 17,5 % DES PRESTATIONS HT"
+    merge(current_row, 2, 6, title)
+    current_row += 1
+    agency_amount_row = current_row
+    style_row(current_row, height=202)
+    merge(current_row, 2, 4, AGENCY_DETAILS, align="left").alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+    fee_base = "+".join(f"F{row}" for row in service_subtotal_rows)
+    money(current_row, (
+        f"=ROUND(({fee_base})*17.5%,0)"
+        if totals["mode_frais_agence"] == "pourcentage" else int(totals["frais_agence"])
+    )).alignment = Alignment(horizontal="right", vertical="bottom")
     current_row += 1
 
     total_ht_row = current_row
-    sheet.cell(row=total_ht_row, column=4, value="TOTAL HT")
-    sheet.cell(row=total_ht_row, column=6, value=f"=F{implementation_row}+F{agency_amount_row}")
+    style_row(current_row, fill=BUDGET_SUBTOTAL, bold=True, height=43)
+    merge(current_row, 2, 5, "TOTAL AVANT TVA SUR HONORAIRES")
+    money(current_row, f"=F{implementation_row}+F{agency_amount_row}")
     current_row += 1
 
-    vat_rate = format(totals["taux_tva_frais_agence"].normalize(), "f")
     vat_row = current_row
-    sheet.cell(row=vat_row, column=4, value=f"TVA {vat_rate}%")
-    sheet.cell(row=vat_row, column=6, value=f"=ROUND(F{agency_amount_row}*{vat_rate}/100,0)")
+    vat_rate = _format_quantity(totals["taux_tva_frais_agence"])
+    style_row(current_row, first=4, bold=True, height=46)
+    merge(current_row, 4, 5, f"TVA {vat_rate} %").fill = PatternFill("solid", fgColor=BUDGET_SUBTOTAL)
+    money(current_row, f"=ROUND(F{agency_amount_row}*{vat_rate}/100,0)")
+    for col in (4, 6):
+        sheet.cell(current_row, col).font = Font(name="Agency FB", size=18, bold=True, color="FF0000")
     current_row += 1
-
-    tax_rows = []
-    for taxe in totals.get("taxes_selectionnees", []):
-        tax_row = current_row
-        tax_rows.append(tax_row)
-        sheet.cell(row=tax_row, column=4, value=str(taxe.get("nom") or taxe.get("code") or "Taxe"))
-        sheet.cell(row=tax_row, column=6, value=float(taxe.get("montant") or 0))
-        current_row += 1
-
     total_ttc_row = current_row
-    sheet.cell(row=total_ttc_row, column=4, value="TOTAL TTC")
-    taxes_formula = f"+SUM(F{tax_rows[0]}:F{tax_rows[-1]})" if tax_rows else ""
-    sheet.cell(row=total_ttc_row, column=6, value=f"=F{total_ht_row}+F{vat_row}{taxes_formula}")
+    style_row(current_row, first=4, fill=BUDGET_TOTAL, bold=True, height=47)
+    merge(current_row, 4, 5, "TOTAL TTC")
+    money(current_row, f"=F{total_ht_row}+F{vat_row}")
     current_row += 1
-
     total_person_row = current_row
-    sheet.cell(row=total_person_row, column=4, value="TOTAL TTC / PERSONNE")
-    sheet.cell(row=total_person_row, column=6, value=f"=F{total_ttc_row}/{participants}")
-
-    for row_index in (total_ht_row, vat_row, *tax_rows, total_ttc_row, total_person_row):
-        for column_index in range(4, 7):
-            cell = sheet.cell(row=row_index, column=column_index)
-            cell.font = body_bold
-            cell.border = regular_border
-            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-            if column_index == 6:
-                cell.number_format = money_format
-        if row_index in (total_ttc_row, total_person_row):
-            for column_index in range(4, 7):
-                sheet.cell(row=row_index, column=column_index).fill = total_fill
-        sheet.row_dimensions[row_index].height = 24
+    style_row(current_row, first=4, fill=BUDGET_TOTAL, bold=True, height=35)
+    merge(current_row, 4, 5, "TOTAL TTC / PERSONNE")
+    money(current_row, f"=F{total_ttc_row}/C11")
 
     notes = _budget_notes(data)
-    note_start_row = total_ttc_row
     for index, note in enumerate(notes):
-        row_index = note_start_row + index
-        cell = sheet.cell(row=row_index, column=2, value=note)
-        cell.font = body_font
+        row = total_ttc_row + index
+        # Notes occupy B only, as in the reference, beside the summary in D:F.
+        sheet.row_dimensions[row].height = max(sheet.row_dimensions[row].height or 0, 32 * max(1, (len(note) + 79) // 80))
+        cell = sheet.cell(row, 2, note)
+        cell.font = Font(name="Agency FB", size=18, bold=True)
+        cell.fill = PatternFill("solid", fgColor=BUDGET_NOTES)
         cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
 
-    for row in sheet.iter_rows(min_row=header_row, max_row=total_person_row, min_col=2, max_col=6):
-        for cell in row:
-            if cell.value is None:
-                cell.border = regular_border
-
+    disclaimer_row = max(total_person_row, total_ttc_row + len(notes) - 1) + 2
+    style_row(disclaimer_row, fill=BUDGET_NOTICE, bold=True, height=180)
+    cell = merge(disclaimer_row, 2, 6, BUDGET_DISCLAIMER)
+    cell.font = Font(name="Calibri", size=24, bold=True, color="000000")
+    notice_edge = Side(style="thin", color="4472C4")
+    cell.border = Border(left=notice_edge, right=notice_edge, top=notice_edge, bottom=notice_edge)
     sheet.freeze_panes = "B16"
-    sheet.page_setup.orientation = "landscape"
+    sheet.page_setup.orientation = "portrait"
     sheet.page_setup.paperSize = sheet.PAPERSIZE_A4
     sheet.page_setup.fitToWidth = 1
     sheet.page_setup.fitToHeight = 0
-    sheet.page_margins.left = 0.35
-    sheet.page_margins.right = 0.35
-    sheet.page_margins.top = 0.45
-    sheet.page_margins.bottom = 0.45
-    sheet.print_area = f"B1:F{max(total_person_row, note_start_row + len(notes) - 1)}"
-
+    sheet.sheet_properties.pageSetUpPr.fitToPage = True
+    sheet.print_options.horizontalCentered = True
+    sheet.print_title_rows = "15:15"
+    sheet.page_margins.left = sheet.page_margins.right = .3
+    sheet.page_margins.top = sheet.page_margins.bottom = .4
+    sheet.print_area = f"B1:F{disclaimer_row}"
     return {
-        "sheet": sheet.title,
-        "subtotal": implementation_row,
-        "fees": agency_amount_row,
-        "vat": vat_row,
-        "total": total_ttc_row,
-        "per_person": total_person_row,
+        "sheet": sheet.title, "subtotal": implementation_row, "fees": agency_amount_row,
+        "vat": vat_row, "total": total_ttc_row, "per_person": total_person_row,
     }
 
 
@@ -863,7 +841,7 @@ def generate_multi_site_budget_excel(
     summary = workbook.active
     summary.title = "Comparatif"
     summary.sheet_view.showGridLines = False
-    summary.append(["Site", "Référence", "Statut", "Prestations HT", "Frais d'agence", "TVA", "Total TTC", "TTC / personne"])
+    summary.append(["Site", "Référence", "Statut", "Mise en œuvre (taxes incluses)", "Frais d'agence", "TVA sur honoraires", "Total TTC", "TTC / personne"])
     labels = {"valide": "Validé", "genere": "Généré", "brouillon": "Brouillon", "annule": "Annulé"}
     for data in budgets:
         cells = _append_budget_sheet(workbook, data)

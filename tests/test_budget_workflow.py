@@ -253,6 +253,20 @@ class BudgetWorkflowTests(unittest.TestCase):
             budgets.create_multi_site_budgets(self.db, [self.payload(), self.payload(2, sections=[])])
         self.assertEqual(self.db.query(Budget).count(), 0)
 
+    def test_pdf_download_refreshes_old_budget_template_only_when_needed(self):
+        from api.budgets.routes import download_budget_pdf
+
+        budget = self.create()
+        budgets.generate_documents_for_budget(self.db, budget)
+        path = budgets.get_budget_pdf_path(budget)
+        os.utime(path, (1, 1))
+        with patch.object(budgets, "generate_documents_for_budget", wraps=budgets.generate_documents_for_budget) as regenerate:
+            response = download_budget_pdf(budget.id, self.db)
+            self.assertEqual(Path(response.path), path)
+            self.assertTrue(budget_documents.is_budget_pdf_current(path))
+            download_budget_pdf(budget.id, self.db)
+            self.assertEqual(regenerate.call_count, 1)
+
     def test_pdf_word_preserve_budget_fees_and_vat(self):
         budget = self.create(taux_tva_frais_agence=18)
         budgets.validate_budget(self.db, budget)
