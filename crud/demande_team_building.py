@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone
 from typing import Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
 from database.models import DemandeTeamBuilding, DemandeTeamBuildingCadre
@@ -23,16 +24,44 @@ def get_demande_team_building(db: Session, demande_id: int) -> Optional[DemandeT
 
 
 def get_demandes_team_building(
-    db: Session, skip: int = 0, limit: int = 100
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    source: str | None = None,
+    statut: str | None = None,
+    lieu: str | None = None,
 ) -> list[DemandeTeamBuilding]:
+    query = db.query(DemandeTeamBuilding).options(
+        selectinload(DemandeTeamBuilding.cadres)
+    )
+    if source:
+        query = query.filter(DemandeTeamBuilding.source == source)
+    if statut:
+        query = query.filter(DemandeTeamBuilding.statut == statut)
+    if lieu and lieu.strip():
+        query = query.filter(DemandeTeamBuilding.lieu_souhaite.ilike(f"%{lieu.strip()}%"))
+
     return (
-        db.query(DemandeTeamBuilding)
-        .options(selectinload(DemandeTeamBuilding.cadres))
+        query
         .order_by(DemandeTeamBuilding.date_demande.desc(), DemandeTeamBuilding.created_at.desc())
         .offset(skip)
         .limit(limit)
         .all()
     )
+
+
+def get_demandes_team_building_stats(db: Session) -> dict[str, int]:
+    total = db.query(func.count(DemandeTeamBuilding.id)).scalar() or 0
+    source_counts = dict(
+        db.query(DemandeTeamBuilding.source, func.count(DemandeTeamBuilding.id))
+        .group_by(DemandeTeamBuilding.source)
+        .all()
+    )
+    return {
+        "total": int(total),
+        "crm": int(source_counts.get("crm", 0)),
+        "site_web": int(source_counts.get("site_web", 0)),
+    }
 
 
 def create_demande_team_building(

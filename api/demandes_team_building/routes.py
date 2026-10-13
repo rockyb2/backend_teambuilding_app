@@ -45,20 +45,48 @@ def _ensure_can_delete_demande(current_user) -> None:
 def list_demandes_team_building(
     skip: int = 0,
     limit: int = 100,
+    source: str | None = None,
+    statut: str | None = None,
+    lieu: str | None = None,
     db: Session = Depends(get_db),
     current_user=Depends(require_module_access("teambuilding")),
 ):
-    return crud_demande_team_building.get_demandes_team_building(db, skip=skip, limit=limit)
+    return crud_demande_team_building.get_demandes_team_building(
+        db,
+        skip=skip,
+        limit=limit,
+        source=source,
+        statut=statut,
+        lieu=lieu,
+    )
 
 
 @router.get("/getDemande", response_model=List[DemandeTeamBuildingRead])
 def get_demandes_team_building(
     skip: int = 0,
     limit: int = 100,
+    source: str | None = None,
+    statut: str | None = None,
+    lieu: str | None = None,
     db: Session = Depends(get_db),
     current_user=Depends(require_module_access("teambuilding")),
 ):
-    return crud_demande_team_building.get_demandes_team_building(db, skip=skip, limit=limit)
+    return crud_demande_team_building.get_demandes_team_building(
+        db,
+        skip=skip,
+        limit=limit,
+        source=source,
+        statut=statut,
+        lieu=lieu,
+    )
+
+
+@router.get("/stats")
+def get_demandes_team_building_stats(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_module_access("teambuilding")),
+):
+    return crud_demande_team_building.get_demandes_team_building_stats(db)
 
 
 @router.get("/{demande_id}", response_model=DemandeTeamBuildingRead)
@@ -71,7 +99,6 @@ def get_demande_team_building(
     if not db_demande:
         raise HTTPException(status_code=404, detail="Demande team building non trouvée")
     return db_demande
-
 
 @router.patch("/{demande_id}/statut", response_model=DemandeTeamBuildingRead)
 def update_demande_team_building_statut(
