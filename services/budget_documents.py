@@ -806,7 +806,7 @@ def _append_budget_sheet(workbook: Workbook, data: dict[str, Any]) -> dict[str, 
     cell.font = Font(name="Calibri", size=24, bold=True, color="000000")
     notice_edge = Side(style="thin", color="4472C4")
     cell.border = Border(left=notice_edge, right=notice_edge, top=notice_edge, bottom=notice_edge)
-    sheet.freeze_panes = "B16"
+    sheet.freeze_panes = None
     sheet.page_setup.orientation = "portrait"
     sheet.page_setup.paperSize = sheet.PAPERSIZE_A4
     sheet.page_setup.fitToWidth = 1
