@@ -83,7 +83,10 @@ def send_email(
     if not smtp_host or not smtp_username or not smtp_password or not from_email:
         raise ValueError("Configuration SMTP incomplète")
 
-    visible_from_email = _clean_email(sender_email) or from_email
+    # The authenticated mailbox must remain the visible sender. Providers such
+    # as Zoho reject attempts to relay a message whose From address belongs to
+    # the requester. The requester stays available through Reply-To.
+    visible_from_email = _clean_email(from_email)
     visible_from_name = _clean_header_value(sender_name)
     reply_email = _clean_email(reply_to_email) or _clean_email(sender_email)
     reply_name = _clean_header_value(reply_to_name) or visible_from_name
@@ -128,7 +131,8 @@ def send_notification_email(
 
     print(
         f"SMTP notification profile={profile or 'DEFAULT'} "
-        f"from={sender_email or settings['from_email']} to={recipient}"
+        f"from={settings['from_email']} to={recipient} "
+        f"reply_to={sender_email or '-'}"
     )
 
     send_email(
