@@ -22,6 +22,7 @@ from services.proforma_pdf import (
 )
 from services.proforma_word import generate_proforma_word, get_proforma_word_path, is_proforma_word_current
 from services.agency_fees import resolve_agency_fee_rate
+from services.proforma_defaults import DEFAULT_TEAMBUILDING_AGENCY_DETAILS
 from services.taxes import calculate_taxes
 
 
@@ -201,7 +202,8 @@ def build_proforma_from_budget(db: Session, budget_id: int) -> dict:
         "taxes_selectionnees": deepcopy(budget.taxes_selectionnees),
         "nombre_nuitees": budget.nombre_nuitees,
         "nombre_chambres": budget.nombre_chambres,
-        "details_frais_agence": [], "modalite_paiement": budget.modalite_paiement,
+        "details_frais_agence": deepcopy(DEFAULT_TEAMBUILDING_AGENCY_DETAILS),
+        "modalite_paiement": budget.modalite_paiement,
         "notes": budget.notes, "recommandations": [], "statut": "validee",
     }
 

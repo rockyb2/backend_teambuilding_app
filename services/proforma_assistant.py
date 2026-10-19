@@ -10,15 +10,11 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from database.models import DemandeTeamBuilding, Offre, Site
+from services.proforma_defaults import DEFAULT_TEAMBUILDING_AGENCY_DETAILS
 from services.proforma_pdf import TEAMBUILDING_AGENCY_FEE_RATE, calculate_totals
 
 
 DEFAULT_PAYMENT_TERMS = "100 % à la commande"
-DEFAULT_AGENCY_DETAILS = [
-    "Conception du programme",
-    "Coordination operationnelle",
-    "Encadrement équipe Ivoir Trips",
-]
 
 _SESSIONS: dict[str, dict[str, Any]] = {}
 
@@ -309,7 +305,7 @@ def build_draft(fields: dict[str, Any], recommendations: list[dict[str, Any]]) -
         "date_evenement": fields.get("date_evenement"),
         "sections": sections,
         "frais_agence": agency_fees,
-        "details_frais_agence": DEFAULT_AGENCY_DETAILS,
+        "details_frais_agence": deepcopy(DEFAULT_TEAMBUILDING_AGENCY_DETAILS),
         "taux_tva_frais_agence": 18,
         "modalite_paiement": DEFAULT_PAYMENT_TERMS,
         "recommandations": recommendations,

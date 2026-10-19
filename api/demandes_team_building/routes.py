@@ -140,6 +140,7 @@ def update_demande_team_building(
 
     updates = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
     updates["statut"] = db_demande.statut
+    updates["source"] = db_demande.source
     return crud_demande_team_building.update_demande_team_building(db, db_demande, updates)
 
 

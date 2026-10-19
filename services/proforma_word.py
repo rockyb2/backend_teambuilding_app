@@ -31,7 +31,7 @@ from services.proforma_pdf import (
 IVT_ORANGE_DARK = "EA580C"
 IVT_ORANGE_SOFT = "FFF1E7"
 IVT_ORANGE_FAINT = "FFF7ED"
-IVT_TABLE_HEADER = "C74C0A"
+IVT_TABLE_HEADER = "004C29"
 IVT_INK = "101828"
 IVT_MUTED = "667085"
 PAGE_CONTENT_WIDTH = Mm(176)
@@ -503,10 +503,13 @@ def _add_financial_summary(
     totals: dict[str, Any],
     agency_fee_label: str,
     vat_rate: Decimal,
+    agency_fee_details: list[str] | None = None,
 ) -> None:
+    detail_lines = [str(detail).strip() for detail in (agency_fee_details or []) if str(detail).strip()]
+    agency_fee_label_with_details = "\n".join([agency_fee_label, *detail_lines])
     rows = [
         ("RÉCAPITULATIF FINANCIER", "Sous-total mise en œuvre", totals["sous_total_ht"]),
-        ("", agency_fee_label, totals["frais_agence"]),
+        ("", agency_fee_label_with_details, totals["frais_agence"]),
         ("", "TOTAL HT", totals["total_ht"]),
         ("", f"TVA {format(vat_rate.normalize(), 'f')} % sur frais d’agence", totals["tva_frais_agence"]),
         ("", "TOTAL TTC", totals["total_ttc"]),
@@ -716,7 +719,13 @@ def generate_proforma_word(data: dict[str, Any], output_dir: str | Path | None =
     _add_document_header(document, data, reference)
     _add_services_table(document, sections)
     _add_spacer(document, 8)
-    _add_financial_summary(document, totals, agency_fee_label, vat_rate)
+    _add_financial_summary(
+        document,
+        totals,
+        agency_fee_label,
+        vat_rate,
+        data.get("details_frais_agence") or [],
+    )
     _add_conditions(document, totals, data)
     _add_control_line(document, totals, agency_fee_label, vat_rate)
     document.save(output_path)

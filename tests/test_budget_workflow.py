@@ -178,6 +178,7 @@ class BudgetWorkflowTests(unittest.TestCase):
         first, second = self.create(), self.create(2)
         budgets.validate_budget(self.db, first)
         values = proformas.build_proforma_from_budget(self.db, first.id)
+        self.assertIn("• Matériels activités Team Building", values["details_frais_agence"])
         proforma = proformas.create_proforma(self.db, ProformaCreate(**values))
         self.assertEqual(proforma.budget_id, first.id)
         self.assertEqual(proforma.total_ttc, first.total_ttc)
@@ -284,6 +285,18 @@ class BudgetWorkflowTests(unittest.TestCase):
         text_content = " ".join(cell.text for table in document.tables for row in table.rows for cell in row.cells)
         self.assertIn("12 345", text_content)
         self.assertIn("2 222", text_content)
+        self.assertIn("Matériels activités Team Building", text_content)
+        self.assertIn("Transport de l’équipe", text_content)
+
+        with patch.object(proforma_pdf, "_markup_paragraph", wraps=proforma_pdf._markup_paragraph) as markup_paragraph:
+            proforma_pdf.generate_proforma_pdf(data, output_dir=self.output.name)
+        agency_detail_markup = [
+            str(call.args[0])
+            for call in markup_paragraph.call_args_list
+            if "Matériels activités Team Building" in str(call.args[0])
+        ]
+        self.assertTrue(agency_detail_markup)
+        self.assertIn("<br/>", agency_detail_markup[0])
 
     def test_percentage_mode_is_calculated_by_server_and_copied_to_proforma(self):
         budget = self.create(mode_frais_agence="pourcentage", frais_agence=1, taux_tva_frais_agence=18)
@@ -316,7 +329,7 @@ class BudgetWorkflowTests(unittest.TestCase):
         services = next(table for table in document.tables if table.cell(0, 0).text == "DESIGNATION")
         for cell in services.rows[0].cells:
             shading = cell._tc.get_or_add_tcPr().find(qn("w:shd"))
-            self.assertEqual(shading.get(qn("w:fill")), "C74C0A")
+            self.assertEqual(shading.get(qn("w:fill")), "004C29")
             self.assertEqual(cell.paragraphs[0].alignment, WD_ALIGN_PARAGRAPH.CENTER)
             header_run = next(run for run in cell.paragraphs[0].runs if run.text)
             self.assertEqual(header_run.font.size.pt, 8.5)
@@ -340,7 +353,7 @@ class BudgetWorkflowTests(unittest.TestCase):
         os.utime(path, (1, 1))
         self.assertFalse(proforma_pdf.is_proforma_pdf_current(path))
         styles = proforma_pdf._styles()
-        self.assertEqual(proforma_pdf.IVT_TABLE_HEADER.hexval(), "0xc74c0a")
+        self.assertEqual(proforma_pdf.IVT_TABLE_HEADER.hexval(), "0x004c29")
         self.assertEqual(styles["table_header"].fontSize, 8.5)
         self.assertEqual(styles["table_cell"].alignment, 1)
 

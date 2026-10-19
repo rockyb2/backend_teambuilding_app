@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from api.dependencies import get_db
 from crud import demande_contact as crud_demande_contact
-from database.schemas import DemandeContactCreate, DemandeContactRead
+from database.schemas import DemandeContactCreate, DemandeContactRead, DemandeContactUpdate
 from services.email_service import build_contact_email, send_notification_email
 from security import require_module_access
 
@@ -32,11 +32,21 @@ def _send_contact_notification(
 @router.get("", response_model=List[DemandeContactRead])
 def get_demandes_contact(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 500,
+    statut: str | None = None,
+    type_demande: str | None = None,
+    source: str | None = None,
     db: Session = Depends(get_db),
     current_user=Depends(require_module_access("administration")),
 ):
-    return crud_demande_contact.get_demandes_contact(db, skip=skip, limit=limit)
+    return crud_demande_contact.get_demandes_contact(
+        db,
+        skip=skip,
+        limit=limit,
+        statut=statut,
+        type_demande=type_demande,
+        source=source,
+    )
 
 
 @router.get("/{demande_id}", response_model=DemandeContactRead)
@@ -49,6 +59,19 @@ def get_demande_contact(
     if not db_demande:
         raise HTTPException(status_code=404, detail="Demande contact non trouvée")
     return db_demande
+
+
+@router.patch("/{demande_id}/statut", response_model=DemandeContactRead)
+def update_demande_contact_statut(
+    demande_id: int,
+    payload: DemandeContactUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_module_access("administration")),
+):
+    db_demande = crud_demande_contact.get_demande_contact(db, demande_id)
+    if not db_demande:
+        raise HTTPException(status_code=404, detail="Demande contact non trouvée")
+    return crud_demande_contact.update_demande_contact_statut(db, db_demande, payload.statut)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

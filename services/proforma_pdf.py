@@ -739,6 +739,15 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
         if agency_rate_label
         else "Frais d’agence"
     )
+    agency_fee_details = [
+        str(detail).strip()
+        for detail in (data.get("details_frais_agence") or [])
+        if str(detail).strip()
+    ]
+    agency_fee_label_with_details = agency_fee_label
+    if agency_fee_details:
+        details_markup = "<br/>".join(escape(detail) for detail in agency_fee_details)
+        agency_fee_label_with_details += f"<br/><font size='7' color='#64748B'>{details_markup}</font>"
 
     financial_rows = [
         [
@@ -748,7 +757,7 @@ def generate_proforma_pdf(data: dict[str, Any], output_dir: str | Path | None = 
         ],
         [
             "",
-            _paragraph(agency_fee_label, styles["summary_label"]),
+            _markup_paragraph(agency_fee_label_with_details, styles["summary_label"]),
             _paragraph(_format_fcfa(totals["frais_agence"]), styles["summary_amount"]),
         ],
         [

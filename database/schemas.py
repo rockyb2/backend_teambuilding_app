@@ -1302,6 +1302,8 @@ class DemandeContactCreate(DemandeContactBase):
     telephone: str
 
 
+class DemandeContactUpdate(ORMBaseModel):
+    statut: Literal["nouvelle", "traitee", "fermee"]
 
 
 class DemandeContactRead(DemandeContactBase):

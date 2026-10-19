@@ -16,19 +16,38 @@ def get_demande_contact(db: Session, demande_id: int) -> Optional[DemandeContact
     return db.query(DemandeContact).filter(DemandeContact.id == demande_id).first()
 
 
-def get_demandes_contact(db: Session, skip: int = 0, limit: int = 100) -> list[DemandeContact]:
-    return (
-        db.query(DemandeContact)
-        .order_by(DemandeContact.created_at.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+def get_demandes_contact(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    statut: str | None = None,
+    type_demande: str | None = None,
+    source: str | None = None,
+) -> list[DemandeContact]:
+    query = db.query(DemandeContact)
+    if statut:
+        query = query.filter(DemandeContact.statut == statut)
+    if type_demande:
+        query = query.filter(DemandeContact.type_demande == type_demande)
+    if source:
+        query = query.filter(DemandeContact.source == source)
+    return query.order_by(DemandeContact.created_at.desc()).offset(skip).limit(limit).all()
 
 
 def create_demande_contact(db: Session, payload: DemandeContactCreate) -> DemandeContact:
     db_demande = DemandeContact(**_model_dump(payload))
     db.add(db_demande)
+    db.commit()
+    db.refresh(db_demande)
+    return db_demande
+
+
+def update_demande_contact_statut(
+    db: Session,
+    db_demande: DemandeContact,
+    statut: str,
+) -> DemandeContact:
+    db_demande.statut = statut
     db.commit()
     db.refresh(db_demande)
     return db_demande

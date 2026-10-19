@@ -188,7 +188,7 @@ class UtilisateurProfileTests(unittest.TestCase):
 
     def test_team_building_full_update_preserves_current_status(self):
         db = Mock()
-        demande = SimpleNamespace(id=12, statut="contactee")
+        demande = SimpleNamespace(id=12, statut="contactee", source="crm")
         payload = DemandeTeamBuildingCreate(
             entreprise="Entreprise Test",
             nom_contact="Contact Test",
@@ -220,6 +220,7 @@ class UtilisateurProfileTests(unittest.TestCase):
 
         updates = update_demande.call_args.args[2]
         self.assertEqual(updates["statut"], "contactee")
+        self.assertEqual(updates["source"], "crm")
 
     def test_internal_team_building_creation_forces_source_and_creator(self):
         db = Mock()
