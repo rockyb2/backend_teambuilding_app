@@ -11,7 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from database.models import Budget, DemandeTeamBuilding, DemandeTourisme, DemandeTourismeCustom, OffreTourisme, Proforma
-from crud.budget import lock_offer, budget_document_data
+from crud.budget import lock_budget_offer, budget_document_data
 from database.schemas import ProformaCreate, ProformaUpdate
 from services.proforma_pdf import (
     BASE_DIR,
@@ -172,7 +172,12 @@ def _validated_budget(db: Session, budget_id: int) -> Budget:
     budget = db.query(Budget).filter(Budget.id == budget_id).first()
     if not budget:
         raise ValueError("Budget non trouvé.")
-    lock_offer(db, budget.offre_id)
+    lock_budget_offer(
+        db,
+        pole=budget.pole,
+        offre_id=budget.offre_id,
+        offre_tourisme_id=budget.offre_tourisme_id,
+    )
     db.refresh(budget)
     if budget.statut != "valide":
         raise ValueError("Seul le budget validé de l'offre peut servir à une nouvelle proforma.")
@@ -181,6 +186,24 @@ def _validated_budget(db: Session, budget_id: int) -> Budget:
 
 def build_proforma_from_budget(db: Session, budget_id: int) -> dict:
     budget = _validated_budget(db, budget_id)
+    if budget.pole == "tourisme":
+        return {
+            "pole": "tourisme", "budget_id": budget.id,
+            "demande_team_building_id": None, "offre_id": None, "site_id": None,
+            "demande_tourisme_id": budget.demande_tourisme_id,
+            "demande_tourisme_custom_id": budget.demande_tourisme_custom_id,
+            "offre_tourisme_id": budget.offre_tourisme_id,
+            "client": budget.client, "client_details": {},
+            "nombre_personnes": budget.nombre_personnes,
+            "objet": budget.titre, "date_proforma": date.today(), "date_evenement": budget.date_evenement,
+            "sections": deepcopy(budget.sections), "frais_agence": budget.frais_agence,
+            "mode_frais_agence": budget.mode_frais_agence,
+            "taux_tva_frais_agence": budget.taux_tva_frais_agence,
+            "taxes_selectionnees": deepcopy(budget.taxes_selectionnees),
+            "nombre_nuitees": budget.nombre_nuitees, "nombre_chambres": budget.nombre_chambres,
+            "details_frais_agence": [], "modalite_paiement": budget.modalite_paiement,
+            "notes": budget.notes, "recommandations": [], "statut": "validee",
+        }
     demande = db.query(DemandeTeamBuilding).filter(DemandeTeamBuilding.id == budget.demande_team_building_id).first()
     return {
         "pole": "teambuilding", "budget_id": budget.id,
@@ -210,13 +233,15 @@ def build_proforma_from_budget(db: Session, budget_id: int) -> dict:
 
 def _attach_budget(db: Session, values: dict, existing: Proforma | None = None) -> dict:
     budget_id = values.get("budget_id")
-    if values.get("pole") != "teambuilding":
-        if budget_id:
-            raise ValueError("Les budgets team building ne peuvent pas être utilisés pour le tourisme.")
-        return values
+    pole = values.get("pole") or "teambuilding"
     if existing and budget_id == existing.budget_id:
         # An existing proforma keeps its snapshot, even after another budget is chosen.
-        if budget_id and any(values.get(key) != getattr(existing, key) for key in ("offre_id", "site_id", "demande_team_building_id")):
+        context_keys = (
+            ("offre_tourisme_id", "demande_tourisme_id", "demande_tourisme_custom_id")
+            if pole == "tourisme"
+            else ("offre_id", "site_id", "demande_team_building_id")
+        )
+        if budget_id and any(values.get(key) != getattr(existing, key) for key in context_keys):
             raise ValueError("Le contexte doit correspondre au budget de la proforma.")
         values["budget_snapshot"] = deepcopy(existing.budget_snapshot)
         return values
@@ -226,9 +251,16 @@ def _attach_budget(db: Session, values: dict, existing: Proforma | None = None) 
         values["budget_snapshot"] = {}
         return values
     budget = _validated_budget(db, budget_id)
+    if budget.pole != pole:
+        raise ValueError("Le budget sélectionné ne correspond pas au module de la proforma.")
     if values.get("mode_frais_agence") is None:
         values["mode_frais_agence"] = budget.mode_frais_agence
-    for key in ("offre_id", "site_id", "demande_team_building_id"):
+    context_keys = (
+        ("offre_tourisme_id", "demande_tourisme_id", "demande_tourisme_custom_id")
+        if pole == "tourisme"
+        else ("offre_id", "site_id", "demande_team_building_id")
+    )
+    for key in context_keys:
         if values.get(key) is not None and values[key] != getattr(budget, key):
             raise ValueError("Le budget sélectionné ne correspond pas à l'offre, au site ou à la demande.")
         values[key] = getattr(budget, key)

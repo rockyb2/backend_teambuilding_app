@@ -7,7 +7,7 @@ AGENCY_FEE_RATE = Decimal("0.175")
 
 def resolve_agency_fee_rate(mode: str | None, legacy_rate: Any = None) -> Any:
     if mode == "pourcentage":
-        return AGENCY_FEE_RATE
+        return legacy_rate if legacy_rate is not None else AGENCY_FEE_RATE
     if mode == "montant":
         return None
     if mode is None:

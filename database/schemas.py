@@ -985,9 +985,13 @@ BudgetStatut = Literal["brouillon", "genere", "valide", "annule"]
 
 
 class BudgetBase(ORMBaseModel):
+    pole: Literal["teambuilding", "tourisme"] = "teambuilding"
     mode_frais_agence: AgencyFeeMode = "montant"
-    offre_id: int
+    offre_id: Optional[int] = None
+    offre_tourisme_id: Optional[int] = None
     demande_team_building_id: Optional[int] = None
+    demande_tourisme_id: Optional[int] = None
+    demande_tourisme_custom_id: Optional[int] = None
     site_id: Optional[int] = None
     titre: str
     client: str
@@ -1021,9 +1025,13 @@ class BudgetValidation(ORMBaseModel):
 
 
 class BudgetUpdate(ORMBaseModel):
+    pole: Optional[Literal["teambuilding", "tourisme"]] = None
     mode_frais_agence: Optional[AgencyFeeMode] = None
     offre_id: Optional[int] = None
+    offre_tourisme_id: Optional[int] = None
     demande_team_building_id: Optional[int] = None
+    demande_tourisme_id: Optional[int] = None
+    demande_tourisme_custom_id: Optional[int] = None
     site_id: Optional[int] = None
     titre: Optional[str] = None
     client: Optional[str] = None

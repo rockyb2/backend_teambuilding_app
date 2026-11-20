@@ -8,7 +8,7 @@ from typing import Optional
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from database.models import Budget, Offre
+from database.models import Budget, Offre, OffreTourisme
 from database.schemas import BudgetCreate, BudgetUpdate
 from services.budget_documents import (
     BASE_DIR, calculate_budget_totals, generate_budget_excel, generate_budget_pdf,
@@ -29,6 +29,25 @@ def lock_offer(db: Session, offre_id: int) -> Offre:
     if not offer:
         raise ValueError("Offre non trouvée.")
     return offer
+
+
+def lock_budget_offer(db: Session, *, pole: str, offre_id: int | None, offre_tourisme_id: int | None):
+    if pole == "tourisme":
+        if not offre_tourisme_id:
+            raise ValueError("L'offre tourisme est obligatoire.")
+        offer = (
+            db.query(OffreTourisme)
+            .filter(OffreTourisme.id == offre_tourisme_id)
+            .with_for_update()
+            .populate_existing()
+            .first()
+        )
+        if not offer:
+            raise ValueError("Offre tourisme non trouvée.")
+        return offer
+    if not offre_id:
+        raise ValueError("L'offre team building est obligatoire.")
+    return lock_offer(db, offre_id)
 
 
 def _model_dump(schema_obj, **kwargs):
@@ -64,11 +83,17 @@ def get_budgets(
     skip: int = 0,
     limit: int = 100,
     offre_id: int | None = None,
+    offre_tourisme_id: int | None = None,
+    pole: str | None = None,
     statut: str | None = None,
 ) -> list[Budget]:
     query = db.query(Budget)
+    if pole:
+        query = query.filter(Budget.pole == pole)
     if offre_id is not None:
         query = query.filter(Budget.offre_id == offre_id)
+    if offre_tourisme_id is not None:
+        query = query.filter(Budget.offre_tourisme_id == offre_tourisme_id)
     if statut:
         query = query.filter(Budget.statut == statut)
     return query.order_by(Budget.created_at.desc()).offset(skip).limit(limit).all()
@@ -103,6 +128,7 @@ def _prepare_values(db: Session, values: dict) -> dict:
         values.get("frais_agence") or 0,
         values.get("taux_tva_frais_agence") or 0,
         values.get("mode_frais_agence") or "montant",
+        20 if values.get("pole") == "tourisme" else Decimal("17.5"),
     )
     values["sections"] = totals["sections"]
     values["frais_agence"] = totals["frais_agence"]
@@ -133,6 +159,26 @@ def sync_offer_montant_from_validated_budgets(db: Session, offre_id: int | None)
         db_offre.montant_total = Decimal(str(total or 0))
 
 
+def sync_tourism_offer_montant_from_validated_budgets(db: Session, offre_tourisme_id: int | None) -> None:
+    if offre_tourisme_id is None:
+        return
+    total = (
+        db.query(Budget.total_ttc)
+        .filter(Budget.offre_tourisme_id == offre_tourisme_id, Budget.statut == "valide")
+        .scalar()
+    )
+    db_offre = db.query(OffreTourisme).filter(OffreTourisme.id == offre_tourisme_id).first()
+    if db_offre:
+        db_offre.montant_total = Decimal(str(total or 0))
+
+
+def sync_budget_offer_amount(db: Session, db_budget: Budget) -> None:
+    if db_budget.pole == "tourisme":
+        sync_tourism_offer_montant_from_validated_budgets(db, db_budget.offre_tourisme_id)
+    else:
+        sync_offer_montant_from_validated_budgets(db, db_budget.offre_id)
+
+
 def create_budget(
     db: Session,
     payload: BudgetCreate,
@@ -144,7 +190,12 @@ def create_budget(
     values = _prepare_values(db, _model_dump(payload))
     if values.get("statut") == "valide":
         raise ValueError("Utilisez l'action Valider pour retenir un budget.")
-    lock_offer(db, values["offre_id"])
+    lock_budget_offer(
+        db,
+        pole=values.get("pole") or "teambuilding",
+        offre_id=values.get("offre_id"),
+        offre_tourisme_id=values.get("offre_tourisme_id"),
+    )
     values["groupe_reference"] = groupe_reference
     values["reference"] = generate_budget_reference(db)
     values["created_by_id"] = created_by_id
@@ -163,9 +214,19 @@ def update_budget(db: Session, db_budget: Budget, payload: BudgetUpdate | dict) 
     if updates.get("statut") == "valide":
         raise ValueError("Utilisez l'action Valider pour retenir un budget.")
     old_offre_id = db_budget.offre_id
-    if any(key in updates and updates[key] != getattr(db_budget, key) for key in ("offre_id", "site_id", "demande_team_building_id")):
+    old_offre_tourisme_id = db_budget.offre_tourisme_id
+    context_keys = (
+        "pole", "offre_id", "offre_tourisme_id", "site_id", "demande_team_building_id",
+        "demande_tourisme_id", "demande_tourisme_custom_id",
+    )
+    if any(key in updates and updates[key] != getattr(db_budget, key) for key in context_keys):
         raise ValueError("Créez un nouveau budget pour changer d'offre, de demande ou de site.")
-    lock_offer(db, old_offre_id)
+    lock_budget_offer(
+        db,
+        pole=db_budget.pole,
+        offre_id=old_offre_id,
+        offre_tourisme_id=old_offre_tourisme_id,
+    )
     db.refresh(db_budget)
     if db_budget.statut == "annule":
         raise BudgetConflict("Un budget annulé ne peut plus être modifié.")
@@ -185,6 +246,7 @@ def update_budget(db: Session, db_budget: Budget, payload: BudgetUpdate | dict) 
     db_budget.fichier_excel = None
     db.flush()
     sync_offer_montant_from_validated_budgets(db, old_offre_id)
+    sync_tourism_offer_montant_from_validated_budgets(db, old_offre_tourisme_id)
     if old_offre_id != db_budget.offre_id:
         sync_offer_montant_from_validated_budgets(db, db_budget.offre_id)
     db.commit()
@@ -198,7 +260,9 @@ def budget_document_data(db_budget: Budget) -> dict:
     lieu = " - ".join(part for part in (site_name, site_location) if part) or site_name or site_location
     return {
         "reference": db_budget.reference,
+        "pole": db_budget.pole,
         "offre_id": db_budget.offre_id,
+        "offre_tourisme_id": db_budget.offre_tourisme_id,
         "site_id": db_budget.site_id,
         "site_nom": site_name,
         "site_localisation": site_location,
@@ -238,6 +302,8 @@ def generate_excel_for_budget(db: Session, db_budget: Budget) -> str:
 
 
 def create_multi_site_budgets(db: Session, payloads: list[BudgetCreate], created_by_id: int | None = None) -> list[Budget]:
+    if any(item.pole != "teambuilding" for item in payloads):
+        raise ValueError("Le comparatif multi-sites est réservé au Team Building.")
     if not payloads or len({item.offre_id for item in payloads}) != 1:
         raise ValueError("Les budgets doivent appartenir à la même offre.")
     site_ids = [item.site_id for item in payloads]
@@ -261,11 +327,16 @@ def create_multi_site_budgets(db: Session, payloads: list[BudgetCreate], created
 
 
 def validate_budget(db: Session, db_budget: Budget, remplacer_budget_id: int | None = None) -> Budget:
-    lock_offer(db, db_budget.offre_id)
+    lock_budget_offer(db, pole=db_budget.pole, offre_id=db_budget.offre_id, offre_tourisme_id=db_budget.offre_tourisme_id)
     db.refresh(db_budget)
     if db_budget.statut == "annule":
         raise BudgetConflict("Budget annulé.")
-    current = db.query(Budget).filter(Budget.offre_id == db_budget.offre_id, Budget.statut == "valide").first()
+    context_filter = (
+        Budget.offre_tourisme_id == db_budget.offre_tourisme_id
+        if db_budget.pole == "tourisme"
+        else Budget.offre_id == db_budget.offre_id
+    )
+    current = db.query(Budget).filter(context_filter, Budget.statut == "valide").first()
     if current and current.id == db_budget.id:
         return db_budget
     if current and current.id != remplacer_budget_id:
@@ -279,14 +350,14 @@ def validate_budget(db: Session, db_budget: Budget, remplacer_budget_id: int | N
         db.flush()
     db_budget.statut = "valide"
     db.flush()
-    sync_offer_montant_from_validated_budgets(db, db_budget.offre_id)
+    sync_budget_offer_amount(db, db_budget)
     db.commit()
     db.refresh(db_budget)
     return db_budget
 
 
 def generate_documents_for_budget(db: Session, db_budget: Budget) -> Budget:
-    lock_offer(db, db_budget.offre_id)
+    lock_budget_offer(db, pole=db_budget.pole, offre_id=db_budget.offre_id, offre_tourisme_id=db_budget.offre_tourisme_id)
     db.refresh(db_budget)
     if db_budget.statut == "annule":
         raise BudgetConflict("Budget annulé.")
@@ -311,9 +382,9 @@ def get_budget_excel_path(db_budget: Budget) -> Path | None:
 
 
 def cancel_budget(db: Session, db_budget: Budget) -> None:
-    lock_offer(db, db_budget.offre_id)
+    lock_budget_offer(db, pole=db_budget.pole, offre_id=db_budget.offre_id, offre_tourisme_id=db_budget.offre_tourisme_id)
     db.refresh(db_budget)
     db_budget.statut = "annule"
     db.flush()
-    sync_offer_montant_from_validated_budgets(db, db_budget.offre_id)
+    sync_budget_offer_amount(db, db_budget)
     db.commit()

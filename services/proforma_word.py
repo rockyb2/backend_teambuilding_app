@@ -691,6 +691,8 @@ def generate_proforma_word(data: dict[str, Any], output_dir: str | Path | None =
     agency_fee_rate = data.get("taux_frais_agence")
     if agency_fee_rate in (None, "") and str(data.get("pole") or "").lower() == "teambuilding" and not data.get("budget_id"):
         agency_fee_rate = TEAMBUILDING_AGENCY_FEE_RATE
+    elif agency_fee_rate in (None, "") and str(data.get("pole") or "").lower() == "tourisme":
+        agency_fee_rate = Decimal("0.20")
     agency_fee_rate = resolve_agency_fee_rate(data.get("mode_frais_agence"), agency_fee_rate)
 
     totals = calculate_totals(

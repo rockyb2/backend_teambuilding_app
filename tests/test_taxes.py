@@ -49,6 +49,48 @@ class TaxCalculationTests(unittest.TestCase):
         self.assertEqual(details[1]["tarif"], 1500.0)
         self.assertEqual(details[1]["nombre_chambres"], 2)
 
+    def test_tdt_uses_hotel_supplier_base(self):
+        db = _Db([
+            SimpleNamespace(
+                id=1,
+                code="TDT",
+                nom="TDT",
+                type_calcul="pourcentage_lignes",
+                taux=Decimal("2.5"),
+                bareme=[],
+            ),
+        ])
+        sections = [
+            {
+                "nom": "Budget",
+                "prestations": [
+                    {
+                        "designation": "Hotel",
+                        "montant_ht": 22700000,
+                        "prestation_hoteliere": True,
+                    },
+                    {
+                        "designation": "Autres prestations",
+                        "montant_ht": 6800000,
+                        "prestation_hoteliere": False,
+                    },
+                ],
+            },
+        ]
+
+        details, total = calculate_taxes(
+            db,
+            [{"code": "TDT"}],
+            33000000,
+            0,
+            0,
+            sections,
+        )
+
+        self.assertEqual(total, Decimal("567500.00"))
+        self.assertEqual(details[0]["base_ht"], 22700000.0)
+        self.assertEqual(details[0]["montant"], 567500.0)
+
     def test_document_total_uses_persisted_tax_snapshot(self):
         totals = add_persisted_taxes(
             {"total_ttc": Decimal("300000")},

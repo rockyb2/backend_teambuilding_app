@@ -308,9 +308,17 @@ def calculate_budget_totals(
     frais_agence: Any = 0,
     taux_tva_frais_agence: Any = 0,
     mode_frais_agence: str = "montant",
+    percentage_rate: Any = Decimal("17.5"),
 ) -> dict[str, Any]:
     normalized_sections, implementation_total = normalize_budget_sections(sections)
-    agency_rate = resolve_agency_fee_rate(mode_frais_agence)
+    try:
+        agency_rate = (
+            Decimal(str(percentage_rate).replace(",", ".")) / Decimal("100")
+            if mode_frais_agence == "pourcentage"
+            else resolve_agency_fee_rate(mode_frais_agence)
+        )
+    except (InvalidOperation, ValueError) as exc:
+        raise ValueError("Le taux des frais d'agence doit être un nombre valide.") from exc
     agency_fees = (
         (implementation_total * agency_rate).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
         if agency_rate is not None else _decimal(frais_agence, "frais_agence")
@@ -330,6 +338,7 @@ def calculate_budget_totals(
         "sous_total_ht": implementation_total,
         "frais_agence": agency_fees,
         "mode_frais_agence": mode_frais_agence,
+        "taux_frais_agence": Decimal(str(percentage_rate).replace(",", ".")) if mode_frais_agence == "pourcentage" else None,
         "taux_tva_frais_agence": vat_rate,
         "tva_frais_agence": vat,
         "total_ht": total_ht,
@@ -360,6 +369,12 @@ AGENCY_DETAILS = (
     "- Restauration de l'équipe\n"
     "- Hébergement de l'équipe"
 )
+TOURISM_AGENCY_DETAILS = (
+    "Honoraires de conception et d'organisation du voyage\n"
+    "- Réservations et coordination des prestataires\n"
+    "- Assistance et suivi du dossier client\n"
+    "- Mise en œuvre opérationnelle du séjour"
+)
 
 
 def _document_totals(data: dict[str, Any]) -> dict[str, Any]:
@@ -372,6 +387,7 @@ def _document_totals(data: dict[str, Any]) -> dict[str, Any]:
     totals = calculate_budget_totals(
         data.get("sections") or [], data.get("frais_agence") or 0,
         data.get("taux_tva_frais_agence") or 0, data.get("mode_frais_agence") or "montant",
+        20 if data.get("pole") == "tourisme" else Decimal("17.5"),
     )
     if not totals["sections"]:
         raise ValueError("Le budget doit contenir au moins une ligne.")
@@ -430,6 +446,7 @@ def _draw_page(canvas: Any, document: Any) -> None:
 
 def generate_budget_pdf(data: dict[str, Any], output_dir: str | Path | None = None) -> str:
     totals = _document_totals(data)
+    agency_details = TOURISM_AGENCY_DETAILS if data.get("pole") == "tourisme" else AGENCY_DETAILS
     output_path = _safe_document_path(data["reference"], "pdf", output_dir)
     width = 190 * mm
     columns = [width * ratio for ratio in (.39, .12, .195, .12, .175)]
@@ -550,11 +567,11 @@ def generate_budget_pdf(data: dict[str, Any], output_dir: str | Path | None = No
 
     fee_title = "HONORAIRES D'AGENCE"
     if totals["mode_frais_agence"] == "pourcentage":
-        fee_title += " — 17,5 % des prestations HT"
+        fee_title += f" — {_format_quantity(totals['taux_frais_agence'])} % des prestations HT"
     vat_rate = _format_quantity(totals["taux_tva_frais_agence"])
     footer_rows = [
         [_paragraph(fee_title, styles["section"]), "", "", "", ""],
-        [Paragraph(escape(AGENCY_DETAILS).replace("\n", "<br/>"), styles["normal"]), "", "", "",
+        [Paragraph(escape(agency_details).replace("\n", "<br/>"), styles["normal"]), "", "", "",
          _paragraph(_document_money(totals["frais_agence"]), styles["right_bold"])],
         [_paragraph("TOTAL AVANT TVA SUR HONORAIRES", styles["section"]), "", "", "",
          _paragraph(_document_money(totals["total_ht"] + totals["total_taxes"]), styles["right_bold"])],
@@ -613,6 +630,7 @@ def generate_budget_pdf(data: dict[str, Any], output_dir: str | Path | None = No
 
 def _append_budget_sheet(workbook: Workbook, data: dict[str, Any]) -> dict[str, Any]:
     totals = _document_totals(data)
+    agency_details = TOURISM_AGENCY_DETAILS if data.get("pole") == "tourisme" else AGENCY_DETAILS
     base_title = _safe_sheet_title(data.get("site_nom") or data.get("titre") or "Budget")
     title, suffix = base_title, 2
     while title.casefold() in {name.casefold() for name in workbook.sheetnames}:
@@ -753,15 +771,15 @@ def _append_budget_sheet(workbook: Workbook, data: dict[str, Any]) -> dict[str, 
     style_row(current_row, fill=BUDGET_SECTION, bold=True, height=45)
     title = "HONORAIRES D'AGENCE"
     if totals["mode_frais_agence"] == "pourcentage":
-        title += " — 17,5 % DES PRESTATIONS HT"
+        title += f" — {_format_quantity(totals['taux_frais_agence'])} % DES PRESTATIONS HT"
     merge(current_row, 2, 6, title)
     current_row += 1
     agency_amount_row = current_row
     style_row(current_row, height=202)
-    merge(current_row, 2, 4, AGENCY_DETAILS, align="left").alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+    merge(current_row, 2, 4, agency_details, align="left").alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
     fee_base = "+".join(f"F{row}" for row in service_subtotal_rows)
     money(current_row, (
-        f"=ROUND(({fee_base})*17.5%,0)"
+        f"=ROUND(({fee_base})*{_format_quantity(totals['taux_frais_agence'])}%,0)"
         if totals["mode_frais_agence"] == "pourcentage" else int(totals["frais_agence"])
     )).alignment = Alignment(horizontal="right", vertical="bottom")
     current_row += 1

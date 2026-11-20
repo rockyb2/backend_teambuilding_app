@@ -437,6 +437,10 @@ def create_tables():
             "modele": "VARCHAR(150) NULL",
         },
         "budgets": {
+            "pole": "VARCHAR(30) NOT NULL DEFAULT 'teambuilding'",
+            "offre_tourisme_id": "INTEGER NULL REFERENCES offre_tourisme(id) ON DELETE CASCADE",
+            "demande_tourisme_id": "INTEGER NULL REFERENCES demandes_tourisme(id) ON DELETE SET NULL",
+            "demande_tourisme_custom_id": "INTEGER NULL REFERENCES demandes_tourisme_custom(id) ON DELETE SET NULL",
             "mode_frais_agence": "VARCHAR(20) NOT NULL DEFAULT 'montant'",
             "groupe_reference": "VARCHAR(50) NULL",
             "taxes_selectionnees": "JSONB NOT NULL DEFAULT '[]'::jsonb",
@@ -520,3 +524,5 @@ def create_tables():
             connection.exec_driver_sql(room_tax_migration.read_text(encoding="utf-8"))
             hotel_vat_migration = Path(__file__).parent / "sql" / "2026_10_08_hotel_vat.sql"
             connection.exec_driver_sql(hotel_vat_migration.read_text(encoding="utf-8"))
+            tdt_hotel_base_migration = Path(__file__).parent / "sql" / "2026_11_20_tdt_hotel_base.sql"
+            connection.exec_driver_sql(tdt_hotel_base_migration.read_text(encoding="utf-8"))

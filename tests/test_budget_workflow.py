@@ -24,7 +24,7 @@ from crud import budget as budgets
 from crud import proforma as proformas
 from crud import site as sites
 from database.base import Base
-from database.models import Budget, Offre
+from database.models import Budget, DemandeTourisme, Offre, OffreTourisme
 from database.schemas import BudgetCreate, ProformaCreate, SiteCreate
 from services import budget_documents, proforma_pdf, proforma_word
 
@@ -41,11 +41,22 @@ class BudgetWorkflowTests(unittest.TestCase):
                 if isinstance(column.type, JSONB):
                     column.type = JSON()
                     column.server_default = None
-        names = ("offre", "budgets", "proformas", "site", "demandes_team_building")
+        names = (
+            "offre", "offre_tourisme", "budgets", "proformas", "site",
+            "demandes_team_building", "demandes_tourisme", "demandes_tourisme_custom",
+        )
         metadata.create_all(self.engine, tables=[metadata.tables[name] for name in names])
         self.db = Session(self.engine)
         self.db.add(Offre(id=1, demande_id=10, titre="Seminaire", montant_total=0))
         self.db.add(Offre(id=2, demande_id=20, titre="Autre offre", montant_total=0))
+        self.db.add(DemandeTourisme(
+            id=101, titre_circuit="Assinie", prenom="Awa", nom="Kone",
+            telephone="0102030405", email="awa@example.com", nombre_voyageurs=4,
+        ))
+        self.db.add(OffreTourisme(
+            id=11, demande_tourisme_id=101, reference="OFF-T-001",
+            titre="Séjour Assinie", montant_total=0,
+        ))
         self.db.commit()
         self.output = tempfile.TemporaryDirectory()
         self.addCleanup(self.output.cleanup)
@@ -230,6 +241,32 @@ class BudgetWorkflowTests(unittest.TestCase):
         self.assertIsNone(proforma.budget_id)
         self.assertEqual(proforma.budget_snapshot, {})
         self.assertEqual(proforma.frais_agence, Decimal("21000"))
+
+    def test_tourism_budget_uses_twenty_percent_and_prefills_proforma(self):
+        budget = budgets.create_budget(self.db, BudgetCreate(
+            pole="tourisme",
+            offre_tourisme_id=11,
+            demande_tourisme_id=101,
+            titre="Séjour Assinie",
+            client="Awa Kone",
+            nombre_personnes=4,
+            date_budget=date(2026, 10, 19),
+            sections=[{"nom": "Voyage", "prestations": [{
+                "designation": "Forfait séjour", "nombre_jours": 1,
+                "quantite": 1, "prix_unitaire": 100000,
+            }]}],
+            mode_frais_agence="pourcentage",
+            taux_tva_frais_agence=18,
+        ))
+        self.assertEqual(budget.frais_agence, Decimal("20000"))
+        budgets.validate_budget(self.db, budget)
+        self.assertEqual(self.db.get(OffreTourisme, 11).montant_total, Decimal("123600"))
+        values = proformas.build_proforma_from_budget(self.db, budget.id)
+        self.assertEqual(values["pole"], "tourisme")
+        self.assertEqual(values["offre_tourisme_id"], 11)
+        proforma = proformas.create_proforma(self.db, ProformaCreate(**values))
+        self.assertEqual(proforma.budget_id, budget.id)
+        self.assertEqual(proforma.total_ttc, budget.total_ttc)
 
     def test_group_excel_and_individual_pdf_regeneration(self):
         members = budgets.create_multi_site_budgets(self.db, [self.payload(), self.payload(2)])

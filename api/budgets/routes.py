@@ -32,7 +32,7 @@ def _payload_dump(payload, **kwargs):
 
 def _get_budget_or_404(db: Session, budget_id: int):
     db_budget = crud_budget.get_budget(db, budget_id)
-    if not db_budget:
+    if not db_budget or db_budget.pole != "teambuilding":
         raise HTTPException(status_code=404, detail="Budget non trouvé")
     return db_budget
 
@@ -68,7 +68,7 @@ def list_budgets(
     statut: str | None = None,
     db: Session = Depends(get_db),
 ):
-    return crud_budget.get_budgets(db, skip=skip, limit=limit, offre_id=offre_id, statut=statut)
+    return crud_budget.get_budgets(db, skip=skip, limit=limit, offre_id=offre_id, statut=statut, pole="teambuilding")
 
 
 @router.get("/{budget_id}", response_model=BudgetRead)

@@ -254,6 +254,7 @@ class OffreTourisme(Base):
     demande_tourisme_custom = relationship("DemandeTourismeCustom", back_populates="offres")
     created_by = relationship("Utilisateur", foreign_keys=[created_by_id])
     proformas = relationship("Proforma", back_populates="offre_tourisme")
+    budgets = relationship("Budget", back_populates="offre_tourisme")
 
 
 class ChatSession(Base):
@@ -1167,6 +1168,12 @@ class Budget(Base):
             postgresql_where=text("statut = 'valide'"),
             sqlite_where=text("statut = 'valide'"),
         ),
+        Index(
+            "uq_budgets_offre_tourisme_valide", "offre_tourisme_id", unique=True,
+            postgresql_where=text("statut = 'valide' AND offre_tourisme_id IS NOT NULL"),
+            sqlite_where=text("statut = 'valide' AND offre_tourisme_id IS NOT NULL"),
+        ),
+        CheckConstraint("pole IN ('teambuilding','tourisme')", name="ck_budgets_pole"),
         CheckConstraint(
             "statut IN ('brouillon','genere','valide','annule')",
             name="ck_budgets_statut",
@@ -1181,21 +1188,25 @@ class Budget(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
+    pole = Column(String(30), nullable=False, default="teambuilding", server_default=text("'teambuilding'"), index=True)
     groupe_reference = Column(String(50), nullable=True, index=True)
     mode_frais_agence = Column(String(20), nullable=False, default="montant", server_default=text("'montant'"))
     reference = Column(String(50), nullable=False, unique=True, index=True)
     offre_id = Column(
         Integer,
         ForeignKey("offre.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
+    offre_tourisme_id = Column(Integer, ForeignKey("offre_tourisme.id", ondelete="CASCADE"), nullable=True, index=True)
     demande_team_building_id = Column(
         Integer,
         ForeignKey("demandes_team_building.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
+    demande_tourisme_id = Column(Integer, ForeignKey("demandes_tourisme.id", ondelete="SET NULL"), nullable=True, index=True)
+    demande_tourisme_custom_id = Column(Integer, ForeignKey("demandes_tourisme_custom.id", ondelete="SET NULL"), nullable=True, index=True)
     site_id = Column(
         Integer,
         ForeignKey("site.id_site", ondelete="SET NULL"),
@@ -1235,7 +1246,10 @@ class Budget(Base):
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
     offre = relationship("Offre", back_populates="budgets")
+    offre_tourisme = relationship("OffreTourisme", back_populates="budgets")
     demande = relationship("DemandeTeamBuilding", back_populates="budgets")
+    demande_tourisme = relationship("DemandeTourisme", back_populates="budgets")
+    demande_tourisme_custom = relationship("DemandeTourismeCustom", back_populates="budgets")
     site = relationship("Site", back_populates="budgets")
     created_by = relationship("Utilisateur", foreign_keys=[created_by_id])
 
@@ -1483,6 +1497,7 @@ class DemandeTourisme(Base):
     created_by = relationship("Utilisateur", foreign_keys=[created_by_id])
     offres = relationship("OffreTourisme", back_populates="demande_tourisme", cascade="all, delete-orphan")
     proformas = relationship("Proforma", back_populates="demande_tourisme")
+    budgets = relationship("Budget", back_populates="demande_tourisme")
     factures = relationship("Facture", back_populates="demande_tourisme")
     depenses = relationship("Depense", back_populates="demande_tourisme")
 
@@ -1544,6 +1559,7 @@ class DemandeTourismeCustom(Base):
     updated_by = relationship("Utilisateur", foreign_keys=[updated_by_id])
     offres = relationship("OffreTourisme", back_populates="demande_tourisme_custom", cascade="all, delete-orphan")
     proformas = relationship("Proforma", back_populates="demande_tourisme_custom")
+    budgets = relationship("Budget", back_populates="demande_tourisme_custom")
     factures = relationship("Facture", back_populates="demande_tourisme_custom")
     depenses = relationship("Depense", back_populates="demande_tourisme_custom")
     created_at = Column(DateTime, nullable=False, server_default=func.now())

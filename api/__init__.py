@@ -9,6 +9,7 @@ from api.offres_tourisme import router as offres_tourisme_router
 from api.factures import router as factures_router
 from api.finance import router as finance_router
 from api.budgets import router as budgets_router
+from api.budgets_tourisme import router as budgets_tourisme_router
 from api.proformas import router as proformas_router
 from api.proformas_tourisme import router as proformas_tourisme_router
 from api.sites import router as sites_router
@@ -55,6 +56,7 @@ def include_api_routes(app):
     app.include_router(factures_router)
     app.include_router(finance_router)
     app.include_router(budgets_router)
+    app.include_router(budgets_tourisme_router)
     app.include_router(proformas_router)
     app.include_router(proformas_tourisme_router)
     app.include_router(sites_router)
